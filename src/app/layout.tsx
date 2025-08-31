@@ -19,7 +19,7 @@ export const metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" className={`${tiltWarp.variable} ${rubik.variable} ${playfair.variable} ${didot.variable} ${bodoni.variable} ${italiana.variable}`}>
-      <body className="bg-primary text-text font-rubik">
+      <body className="bg-[#feedf2] text-text font-rubik">
         <Header />
         <main>{children}</main>
         <Footer />

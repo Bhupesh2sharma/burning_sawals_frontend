@@ -18,6 +18,7 @@ export const deleteGenreById = (genreId: string) => apiFetch(`/genres/${genreId}
 export const createQuestion = (data: object) => apiFetch('/questions', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
 export const getQuestionsByGenre = (genreId: string) => apiFetch(`/questions/genre/${genreId}`);
 export const updateQuestion = (questionId: string, data: object) => apiFetch(`/questions/${questionId}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
+export const getAllQuestions = () => apiFetch('/questions');
 
 // Question Type APIs
 export const getAllQuestionTypes = () => apiFetch('/question-types');
