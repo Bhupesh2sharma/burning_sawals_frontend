@@ -399,44 +399,44 @@ export default function AdminPage() {
               {/* Only show the active section */}
               {activeAdminTab === 'add-question' && (
                 <div className="mb-4">
-                    <div className="flex gap-4 mb-6">
-                <div>
-                  <select
-                    className="bg-pink-400 text-white px-6 py-2 rounded-full font-medium focus:outline-none"
-                    value={selectedCategory}
-                    onChange={e => setSelectedCategory(e.target.value)}
-                  >
-                    {categories.map(cat => (
-                      <option key={cat} value={cat}>{cat}</option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <select
-                    className="bg-pink-400 text-white px-6 py-2 rounded-full font-medium focus:outline-none"
-                    value={selectedStarter}
-                    onChange={e => setSelectedStarter(e.target.value)}
-                  >
-                    {starters.map(st => (
-                      <option key={st} value={st}>{st}</option>
-                    ))}
-                  </select>
-                </div>
-              </div>
+          <div className="flex gap-4 mb-6">
+            <div>
+              <select
+                className="bg-pink-400 text-white px-6 py-2 rounded-full font-medium focus:outline-none"
+                value={selectedCategory}
+                onChange={e => setSelectedCategory(e.target.value)}
+              >
+                {categories.map(cat => (
+                  <option key={cat} value={cat}>{cat}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <select
+                className="bg-pink-400 text-white px-6 py-2 rounded-full font-medium focus:outline-none"
+                value={selectedStarter}
+                onChange={e => setSelectedStarter(e.target.value)}
+              >
+                {starters.map(st => (
+                  <option key={st} value={st}>{st}</option>
+                ))}
+              </select>
+            </div>
+          </div>
                   {/* Add Question Form */}
                   <form className="flex flex-col gap-2 mb-2 bg-white p-4 rounded shadow" onSubmit={handleAddQuestion}>
-                    <input
+                <input
                       className="border px-2 py-1 rounded"
                       placeholder="Question (e.g. What is the derivative of x²?)"
-                      value={newQuestion}
-                      onChange={e => setNewQuestion(e.target.value)}
+                  value={newQuestion}
+                  onChange={e => setNewQuestion(e.target.value)}
                       required
                     />
-                    <input
+                <input
                       className="border px-2 py-1 rounded"
                       placeholder="Prompt (e.g. Remember to use the power rule...)"
-                      value={newPrompt}
-                      onChange={e => setNewPrompt(e.target.value)}
+                  value={newPrompt}
+                  onChange={e => setNewPrompt(e.target.value)}
                       required
                     />
                     <select
@@ -452,22 +452,22 @@ export default function AdminPage() {
                     </select>
                     <div className="flex gap-2">
                       <button type="submit" className="bg-pink-500 text-white px-4 py-1 rounded hover:bg-pink-600 transition">Submit</button>
-                    </div>
+              </div>
                   </form>
                   {addQuestionStatus.success && <div className="text-green-600 text-sm mt-1">{addQuestionStatus.success}</div>}
                   {addQuestionStatus.error && <div className="text-red-600 text-sm mt-1">{addQuestionStatus.error}</div>}
                   {/* Questions Table */}
                   <div className="overflow-x-auto bg-white rounded shadow mt-8">
-                    <table className="min-w-full text-sm">
-                      <thead>
-                        <tr className="border-b">
-                          <th className="px-4 py-2 text-left font-semibold">Question</th>
-                          <th className="px-4 py-2 text-left font-semibold">Prompt</th>
+            <table className="min-w-full text-sm">
+              <thead>
+                <tr className="border-b">
+                  <th className="px-4 py-2 text-left font-semibold">Question</th>
+                  <th className="px-4 py-2 text-left font-semibold">Prompt</th>
                           <th className="px-2 py-2 text-right font-semibold">Actions</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {questions.map((q, idx) => (
+                </tr>
+              </thead>
+              <tbody>
+                {questions.map((q, idx) => (
                           <tr key={q.question_id || idx} className="border-b">
                             <td className="px-4 py-2 align-top">{editingQuestionId === q.question_id ? (
                               <input
@@ -514,19 +514,19 @@ export default function AdminPage() {
                                       setEditingGenreIds((q.genres || []).map((g: any) => g.genre_id));
                                     }}
                                   >
-                                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
-                                      <path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487a2.1 2.1 0 1 1 2.97 2.97L7.5 19.788l-4 1 1-4 14.362-14.3z" />
-                                    </svg>
-                                  </button>
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487a2.1 2.1 0 1 1 2.97 2.97L7.5 19.788l-4 1 1-4 14.362-14.3z" />
+                        </svg>
+                      </button>
                                   <button
                                     className="text-red-500 hover:text-red-700"
                                     title="Delete"
                                     onClick={() => handleDeleteQuestion(q.question_id)}
                                   >
-                                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
-                                      <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                                    </svg>
-                                  </button>
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      </button>
                                 </>
                               )}
                             </td>
@@ -764,14 +764,14 @@ export default function AdminPage() {
                                 </button>
                               </>
                             )}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
                   {genreStatus.success && <div className="text-green-600 text-sm mt-1">{genreStatus.success}</div>}
                   {genreStatus.error && <div className="text-red-600 text-sm mt-1">{genreStatus.error}</div>}
-                </div>
+          </div>
               )}
               {/* Dropdowns */}
             
@@ -781,8 +781,8 @@ export default function AdminPage() {
              
               {/* Table */}
             
-              {/* Pagination */}
-              <div className="text-center mt-8 text-gray-600">Page 1</div>
+          {/* Pagination */}
+          <div className="text-center mt-8 text-gray-600">Page 1</div>
             </>
           )}
           {selectedSection === "Analytics" && (

@@ -2,6 +2,7 @@ import "./globals.css";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import { Tilt_Warp, Rubik, Playfair_Display, GFS_Didot, Libre_Bodoni, Italiana } from "next/font/google";
+import AuthProvider from "../components/AuthProvider";
 
 // Fonts
 const tiltWarp = Tilt_Warp({ subsets: ["latin"], weight: "400", variable: "--font-tilt" });
@@ -18,12 +19,14 @@ export const metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={`${tiltWarp.variable} ${rubik.variable} ${playfair.variable} ${didot.variable} ${bodoni.variable} ${italiana.variable}`}>
-      <body className="bg-[#feedf2] text-text font-rubik">
-        <Header />
-        <main>{children}</main>
-        <Footer />
-      </body>
-    </html>
+    <AuthProvider>
+      <html lang="en" className={`${tiltWarp.variable} ${rubik.variable} ${playfair.variable} ${didot.variable} ${bodoni.variable} ${italiana.variable}`}>
+        <body className="bg-[#feedf2] text-text font-rubik">
+          <Header />
+          <main>{children}</main>
+          <Footer />
+        </body>
+      </html>
+    </AuthProvider>
   );
 }
