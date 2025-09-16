@@ -100,24 +100,32 @@ export interface AuthContextType {
     isAuthenticated: boolean;
     isLoading: boolean;
     sendOTP: (
-        phoneNumber: string
-    ) => Promise<{ success: boolean; message: string }>;
+        phoneNumber: string,
+        captchaToken: string
+    ) => Promise<{
+        success: boolean;
+        message: string;
+        otp_id?: string;
+        is_existing_user?: boolean;
+    }>;
     verifyOTP: (
         phoneNumber: string,
         otp: string,
         userName?: string
     ) => Promise<{ success: boolean; user?: User; message: string }>;
-    login: (
-        phoneNumber: string,
-        otp: string
-    ) => Promise<{ success: boolean; user?: User; message: string }>;
+    checkUsername: (
+        userName: string
+    ) => Promise<{ success: boolean; available: boolean; message: string }>;
     logout: () => void;
     refreshToken: () => Promise<void>;
 }
 
 export class AuthService {
-    static async sendOTP(phone_number: string) {
-        return axios.post(`${BASE_URL}/auth/phone/send-otp`, { phone_number });
+    static async sendOTP(phone_number: string, captcha_token: string) {
+        return axios.post(`${BASE_URL}/auth/phone/send-otp`, {
+            phone_number,
+            captcha_token,
+        });
     }
     static async verifyOTP(
         phone_number: string,
