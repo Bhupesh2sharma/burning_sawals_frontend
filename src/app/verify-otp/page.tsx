@@ -139,7 +139,17 @@ export default function OTPVerificationPage() {
             }
         } catch (err: any) {
             console.error("Resend OTP error:", err);
-            setApiError("Failed to resend OTP");
+
+            // Handle different types of errors
+            if (err.response?.status === 429) {
+                setApiError(
+                    "Too many OTP requests. Please wait a few minutes before trying again."
+                );
+            } else if (err.response?.data?.message) {
+                setApiError(err.response.data.message);
+            } else {
+                setApiError("Failed to resend OTP. Please try again.");
+            }
         } finally {
             setLoading(false);
         }
@@ -195,7 +205,18 @@ export default function OTPVerificationPage() {
             }
         } catch (err: any) {
             console.error("OTP verification error:", err);
-            setApiError("An unexpected error occurred");
+
+            // Handle different types of errors
+            if (err.response?.status === 429) {
+                setApiError(
+                    "Too many verification attempts. Please wait a few minutes before trying again."
+                );
+            } else if (err.response?.data?.message) {
+                setApiError(err.response.data.message);
+            } else {
+                setApiError("An unexpected error occurred. Please try again.");
+            }
+
             // Clear OTP on error
             setOtp(["", "", "", "", "", ""]);
             otpRefs.current[0]?.focus();

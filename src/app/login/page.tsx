@@ -87,14 +87,18 @@ export default function PhoneNumberPage() {
                 router.push("/verify-otp");
             } else {
                 setApiError(result.message);
-                // Clear CAPTCHA token on error for retry
-                setCaptchaToken("");
             }
         } catch (err: any) {
             console.error("Error sending OTP:", err);
-            setApiError("Failed to send OTP");
-            // Clear CAPTCHA token on error for retry
-            setCaptchaToken("");
+            
+            // Handle different types of errors
+            if (err.response?.status === 429) {
+                setApiError("Too many requests. Please wait a few minutes before trying again.");
+            } else if (err.response?.data?.message) {
+                setApiError(err.response.data.message);
+            } else {
+                setApiError("Failed to send OTP. Please try again.");
+            }
         } finally {
             setLoading(false);
         }

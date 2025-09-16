@@ -156,11 +156,7 @@ export default function RecaptchaV3({
         );
     }
 
-    return (
-        <div className="text-sm text-green-500 text-center">
-            ✓ Security verification ready
-        </div>
-    );
+    return null;
 }
 
 // Helper function to execute reCAPTCHA from anywhere
