@@ -15,9 +15,9 @@ interface AuthContextType {
   token: string | null;
   isAuthenticated: boolean;
   isLoading: boolean;
-  sendOTP: (phoneNumber: string) => Promise<{ success: boolean; message: string; otp_id?: string }>;
+  sendOTP: (phoneNumber: string) => Promise<{ success: boolean; message: string; otp_id?: string; is_existing_user?: boolean }>;
   verifyOTP: (phoneNumber: string, otp: string, userName?: string) => Promise<{ success: boolean; user?: User; message: string }>;
-  login: (phoneNumber: string, otp: string) => Promise<{ success: boolean; user?: User; message: string }>;
+  checkUsername: (userName: string) => Promise<{ success: boolean; available: boolean; message: string }>;
   logout: () => void;
   refreshToken: () => Promise<void>;
 }
@@ -43,7 +43,12 @@ export default function AuthProvider({ children }: { children: ReactNode }) {
   const sendOTP = async (phoneNumber: string) => {
     try {
       const response = await AuthService.sendOTP(phoneNumber);
-      return { success: true, message: response.data.message, otp_id: response.data.data.otp_id };
+      return { 
+        success: true, 
+        message: response.data.message, 
+        otp_id: response.data.data.otp_id,
+        is_existing_user: response.data.data.is_existing_user
+      };
     } catch (error: any) {
       return { success: false, message: error.response?.data?.message || "Failed to send OTP" };
     }
@@ -63,17 +68,16 @@ export default function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const login = async (phoneNumber: string, otp: string) => {
+  const checkUsername = async (userName: string) => {
     try {
-      const response = await AuthService.login(phoneNumber, otp);
-      const newToken = response.data.data.token;
-      const loggedInUser = response.data.data.user;
-      localStorage.setItem("auth_token", newToken);
-      setToken(newToken);
-      setUser(loggedInUser);
-      return { success: true, user: loggedInUser, message: response.data.message };
+      const response = await AuthService.checkUsername(userName);
+      return { 
+        success: true, 
+        available: response.data.data.available,
+        message: response.data.data.message
+      };
     } catch (error: any) {
-      return { success: false, message: error.response?.data?.message || "Login failed" };
+      return { success: false, available: false, message: error.response?.data?.message || "Failed to check username" };
     }
   };
 
@@ -96,7 +100,7 @@ export default function AuthProvider({ children }: { children: ReactNode }) {
     isLoading,
     sendOTP,
     verifyOTP,
-    login,
+    checkUsername,
     logout,
     refreshToken,
   };

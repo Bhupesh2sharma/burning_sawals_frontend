@@ -1,15 +1,15 @@
 "use client";
 import React, { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
-import { AuthService } from "../../utils/api";
+import { useAuth } from "../../components/AuthProvider";
 import { useRouter } from "next/navigation";
-
-// Removed zod schema - using inline validation instead
 
 export default function PhoneNumberPage() {
   const [apiError, setApiError] = useState("");
   const [loading, setLoading] = useState(false);
   const [otpSent, setOtpSent] = useState(false);
+  const [isExistingUser, setIsExistingUser] = useState<boolean | null>(null);
+  const { sendOTP } = useAuth();
   const router = useRouter();
   const {
     register,
@@ -30,14 +30,21 @@ export default function PhoneNumberPage() {
     setLoading(true);
     try {
       console.log("Sending OTP to:", data.phone);
-      await AuthService.sendOTP(data.phone);
-      console.log("OTP sent successfully");
-      setOtpSent(true);
-      localStorage.setItem("auth_phone", data.phone);
-      router.push("/verify-otp");
+      const result = await sendOTP(data.phone);
+      
+      if (result.success) {
+        console.log("OTP sent successfully");
+        setOtpSent(true);
+        setIsExistingUser(result.is_existing_user || false);
+        localStorage.setItem("auth_phone", data.phone);
+        localStorage.setItem("is_existing_user", String(result.is_existing_user || false));
+        router.push("/verify-otp");
+      } else {
+        setApiError(result.message);
+      }
     } catch (err: any) {
       console.error("Error sending OTP:", err);
-      setApiError(err?.response?.data?.message || "Failed to send OTP");
+      setApiError("Failed to send OTP");
     } finally {
       setLoading(false);
     }
