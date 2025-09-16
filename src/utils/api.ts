@@ -147,3 +147,160 @@ export class AuthService {
         });
     }
 }
+
+// Analytics APIs
+export class AnalyticsService {
+  // Question Interactions
+  static async addQuestionInteraction(questionId: string, interactionType: 'like' | 'dislike' | 'super_like', token: string) {
+    if (!token || typeof token !== 'string' || token.trim().length === 0) {
+      throw new Error('Invalid or missing authentication token');
+    }
+    
+    const cleanToken = token.trim();
+    return axios.post(`${BASE_URL}/analytics/questions/${questionId}/interact`, 
+      { interaction_type: interactionType },
+      { 
+        headers: { 
+          'Authorization': `Bearer ${cleanToken}`,
+          'Content-Type': 'application/json'
+        } 
+      }
+    );
+  }
+
+  static async removeQuestionInteraction(questionId: string, interactionType: 'like' | 'dislike' | 'super_like', token: string) {
+    if (!token || typeof token !== 'string' || token.trim().length === 0) {
+      throw new Error('Invalid or missing authentication token');
+    }
+    
+    const cleanToken = token.trim();
+    return axios.delete(`${BASE_URL}/analytics/questions/${questionId}/interact`, 
+      { 
+        data: { interaction_type: interactionType },
+        headers: { 
+          'Authorization': `Bearer ${cleanToken}`,
+          'Content-Type': 'application/json'
+        } 
+      }
+    );
+  }
+
+  static async getUserInteractionsForQuestion(questionId: string, token: string) {
+    return axios.get(`${BASE_URL}/analytics/questions/${questionId}/interactions`, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+  }
+
+  // Question Analytics
+  static async getQuestionAnalytics(questionId: string, token: string) {
+    return axios.get(`${BASE_URL}/analytics/questions/${questionId}`, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+  }
+
+  static async getAllQuestionsWithAnalytics(token: string, page = 1, limit = 20, sortBy = 'total_interactions', sortOrder = 'desc') {
+    // This endpoint doesn't exist yet, return mock data
+    return Promise.resolve({
+      data: {
+        data: {
+          items: [],
+          page: page,
+          limit: limit,
+          total: 0,
+          total_pages: 0
+        }
+      }
+    });
+  }
+
+  // User Analytics - Get all users analytics
+  static async getAllUsersAnalytics(token: string) {
+    try {
+      return await axios.get(`${BASE_URL}/analytics/users`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+    } catch (error: any) {
+      if (error.response?.status === 401) {
+        throw new Error('Token expired. Please login again.');
+      }
+      throw error;
+    }
+  }
+
+  // User Analytics - Get current user analytics (mock for now)
+  static async getUserAnalytics(token: string) {
+    try {
+      // Since we don't have a /me endpoint, we'll get all users and filter
+      const response = await axios.get(`${BASE_URL}/analytics/users`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      
+      // Return the first user as "current user" for now
+      const users = response.data?.data || response.data || [];
+      return {
+        data: {
+          data: users[0] || {
+            user_id: "1",
+            total_likes_given: 0,
+            total_super_likes_given: 0,
+            total_dislikes_given: 0,
+            total_interactions_given: 0,
+            last_updated: new Date().toISOString()
+          }
+        }
+      };
+    } catch (error: any) {
+      if (error.response?.status === 401) {
+        throw new Error('Token expired. Please login again.');
+      }
+      throw error;
+    }
+  }
+
+  static async getUserInteractionHistory(token: string, page = 1, limit = 20) {
+    // This endpoint doesn't exist yet, return mock data
+    return Promise.resolve({
+      data: {
+        data: {
+          items: [],
+          page: 1,
+          limit: 20,
+          total: 0
+        }
+      }
+    });
+  }
+
+  // Top Questions
+  static async getTopQuestions(token: string, type = 'total', limit = 10) {
+    // This endpoint doesn't exist yet, return mock data
+    return Promise.resolve({
+      data: {
+        data: {
+          items: [],
+          type: type,
+          limit: limit
+        }
+      }
+    });
+  }
+
+  // Monitoring APIs
+  static async getSystemHealth(token: string) {
+    return axios.get(`${BASE_URL}/monitoring/health`, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+  }
+
+  static async getDailyStats(token: string) {
+    return axios.get(`${BASE_URL}/monitoring/daily-stats`, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+  }
+
+  static async getMetrics(token: string) {
+    return axios.get(`${BASE_URL}/monitoring/metrics`, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+  }
+}

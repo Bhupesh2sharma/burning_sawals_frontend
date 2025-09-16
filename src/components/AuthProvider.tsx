@@ -51,6 +51,7 @@ export default function AuthProvider({ children }: { children: ReactNode }) {
     const [token, setToken] = useState<string | null>(null);
     const [isLoading, setIsLoading] = useState(true); // Start as true to check local storage
 
+
     useEffect(() => {
         const storedToken = localStorage.getItem("auth_token");
         if (storedToken) {
@@ -61,6 +62,7 @@ export default function AuthProvider({ children }: { children: ReactNode }) {
         }
         setIsLoading(false);
     }, []);
+
 
     const sendOTP = async (phoneNumber: string, captchaToken: string) => {
         try {
@@ -136,6 +138,7 @@ export default function AuthProvider({ children }: { children: ReactNode }) {
         setUser(null);
         // router.push("/login"); // Redirect to login after logout
     };
+
 
     const refreshToken = async () => {
         // Implement token refresh logic here

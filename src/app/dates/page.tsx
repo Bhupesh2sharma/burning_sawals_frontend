@@ -4,7 +4,7 @@ import Image from "next/image";
 import { FiHome } from "react-icons/fi";
 import { BiSolidComment } from "react-icons/bi";
 import { AiOutlineLike, AiOutlineDislike } from "react-icons/ai";
-import { getAllQuestionTypes, getQuestionsByGenre } from "../../utils/api";
+import { getAllQuestionTypes, getQuestionsByGenre, AnalyticsService, tokenStorage } from "../../utils/api";
 
 export default function DatesPage() {
   const [dateGenres, setDateGenres] = useState<any[]>([]);
@@ -12,6 +12,8 @@ export default function DatesPage() {
   const [questions, setQuestions] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [currentQuestionIdx, setCurrentQuestionIdx] = useState(0);
+  const [interactions, setInteractions] = useState<{[questionId: string]: 'like' | 'dislike' | 'super_like' | null}>({});
+  const [isInteracting, setIsInteracting] = useState(false);
 
   // Fetch genres for 'For Date' question type
   useEffect(() => {
@@ -54,6 +56,79 @@ export default function DatesPage() {
 
   // Get current question
   const currentQuestion = questions[currentQuestionIdx];
+
+  // Debug function to check token status
+  const debugTokenStatus = () => {
+    const token = tokenStorage.get();
+    console.log('Token Debug Info:', {
+      tokenExists: !!token,
+      tokenType: typeof token,
+      tokenLength: token?.length || 0,
+      tokenPreview: token ? token.substring(0, 20) + '...' : 'null',
+      localStorage: {
+        auth_token: localStorage.getItem('auth_token'),
+        allKeys: Object.keys(localStorage)
+      }
+    });
+  };
+
+  // Handle question interactions
+  const handleInteraction = async (interactionType: 'like' | 'dislike' | 'super_like') => {
+    if (!currentQuestion || isInteracting) return;
+    
+    // Debug token status
+    debugTokenStatus();
+    
+    const token = tokenStorage.get();
+    if (!token) {
+      console.error('No authentication token found. Please login first.');
+      alert('Please login first to interact with questions.');
+      return;
+    }
+
+    // Additional token validation
+    if (typeof token !== 'string' || token.trim().length === 0) {
+      console.error('Invalid token format');
+      alert('Invalid authentication token. Please login again.');
+      return;
+    }
+
+    setIsInteracting(true);
+    const questionId = String(currentQuestion.question_id);
+    const currentInteraction = interactions[questionId];
+
+    try {
+      console.log('Attempting interaction:', {
+        questionId,
+        interactionType,
+        currentInteraction,
+        tokenLength: token.length,
+        tokenStart: token.substring(0, 10)
+      });
+
+      // If user is clicking the same interaction type, remove it
+      if (currentInteraction === interactionType) {
+        await AnalyticsService.removeQuestionInteraction(questionId, interactionType, token);
+        setInteractions(prev => ({ ...prev, [questionId]: null }));
+        console.log('Removed interaction:', interactionType);
+      } else {
+        // If user has a different interaction, remove it first
+        if (currentInteraction) {
+          await AnalyticsService.removeQuestionInteraction(questionId, currentInteraction, token);
+          console.log('Removed previous interaction:', currentInteraction);
+        }
+        // Add new interaction
+        await AnalyticsService.addQuestionInteraction(questionId, interactionType, token);
+        setInteractions(prev => ({ ...prev, [questionId]: interactionType }));
+        console.log('Added interaction:', interactionType);
+      }
+    } catch (error) {
+      console.error('Error handling interaction:', error);
+      alert('Failed to update interaction. Please try again.');
+    } finally {
+      setIsInteracting(false);
+    }
+  };
 
   return (
     <div className="flex flex-col bg-[#feedf2]">
@@ -116,12 +191,35 @@ export default function DatesPage() {
           <BiSolidComment size={46} color="#D0BCFF" />
         </button>
         <div className="flex gap-2">
-          <button type="button">
+          <button 
+            type="button" 
+            onClick={() => handleInteraction('like')}
+            disabled={isInteracting}
+            className={`${isInteracting ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'} ${
+              interactions[currentQuestion?.question_id] === 'like' ? 'text-blue-500' : ''
+            }`}
+          >
             <AiOutlineLike size={40} />
           </button>
-          <Image src="/icon4.png" alt="fire" width={40} height={40} />
+          <button 
+            type="button" 
+            onClick={() => handleInteraction('super_like')}
+            disabled={isInteracting}
+            className={`${isInteracting ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'} ${
+              interactions[currentQuestion?.question_id] === 'super_like' ? 'text-orange-500' : ''
+            }`}
+          >
+            <Image src="/icon4.png" alt="fire" width={40} height={40} />
+          </button>
         </div>
-        <button type="button">
+        <button 
+          type="button" 
+          onClick={() => handleInteraction('dislike')}
+          disabled={isInteracting}
+          className={`${isInteracting ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'} ${
+            interactions[currentQuestion?.question_id] === 'dislike' ? 'text-red-500' : ''
+          }`}
+        >
           <AiOutlineDislike size={40} />
         </button>
       </nav>
