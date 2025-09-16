@@ -31,11 +31,19 @@ export default function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const storedToken = localStorage.getItem("auth_token");
+    const storedUser = localStorage.getItem("auth_user");
+    
     if (storedToken) {
       setToken(storedToken);
-      // In a real app, you'd verify the token with the backend here
-      // For now, assume it's valid and fetch user info if needed
-      // setUser(decodeToken(storedToken)); // Example: decode token to get user info
+      // Try to parse stored user data
+      if (storedUser) {
+        try {
+          const userData = JSON.parse(storedUser);
+          setUser(userData);
+        } catch (error) {
+          console.error("Error parsing stored user data:", error);
+        }
+      }
     }
     setIsLoading(false);
   }, []);
@@ -55,6 +63,7 @@ export default function AuthProvider({ children }: { children: ReactNode }) {
       const newToken = response.data.data.token;
       const newUser = response.data.data.user;
       localStorage.setItem("auth_token", newToken);
+      localStorage.setItem("auth_user", JSON.stringify(newUser));
       setToken(newToken);
       setUser(newUser);
       return { success: true, user: newUser, message: response.data.message };
@@ -69,6 +78,7 @@ export default function AuthProvider({ children }: { children: ReactNode }) {
       const newToken = response.data.data.token;
       const loggedInUser = response.data.data.user;
       localStorage.setItem("auth_token", newToken);
+      localStorage.setItem("auth_user", JSON.stringify(loggedInUser));
       setToken(newToken);
       setUser(loggedInUser);
       return { success: true, user: loggedInUser, message: response.data.message };
@@ -79,6 +89,7 @@ export default function AuthProvider({ children }: { children: ReactNode }) {
 
   const logout = () => {
     localStorage.removeItem("auth_token");
+    localStorage.removeItem("auth_user");
     setToken(null);
     setUser(null);
     // router.push("/login"); // Redirect to login after logout
