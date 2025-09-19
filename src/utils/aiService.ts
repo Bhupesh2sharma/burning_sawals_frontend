@@ -31,18 +31,37 @@ export class AIService {
       
       Return ONLY the questions, one per line, without numbering or bullet points.`;
 
+      let result;
       switch (apiProvider) {
         case 'huggingface':
-          return await this.generateWithHuggingFace(systemPrompt);
+          result = await this.generateWithHuggingFace(systemPrompt);
+          break;
         case 'openai':
-          return await this.generateWithOpenAI(systemPrompt);
+          result = await this.generateWithOpenAI(systemPrompt);
+          break;
         case 'openrouter':
-          return await this.generateWithOpenRouter(systemPrompt);
+          result = await this.generateWithOpenRouter(systemPrompt);
+          break;
         case 'cohere':
-          return await this.generateWithCohere(systemPrompt);
+          result = await this.generateWithCohere(systemPrompt);
+          break;
         default:
           return { questions: [], success: false, error: 'Invalid API provider' };
       }
+
+      // If AI generation fails, fall back to sample questions
+      if (!result.success) {
+        console.log('AI generation failed, using sample questions:', result.error);
+        const sampleQuestions = this.generateSampleQuestions(genre);
+        return { 
+          questions: sampleQuestions.slice(0, count), 
+          success: true,
+          fallback: true,
+          error: `AI generation failed (${result.error}), showing sample questions instead.`
+        };
+      }
+
+      return result;
     } catch (error) {
       console.error('AI Service Error:', error);
       return { 
@@ -56,36 +75,85 @@ export class AIService {
   // Hugging Face Inference API (Free tier available)
   private static async generateWithHuggingFace(prompt: string): Promise<{ questions: string[]; success: boolean; error?: string }> {
     try {
-      // Using a text generation model
-      const response = await axios.post(
-        `${this.HUGGINGFACE_API_URL}/microsoft/DialoGPT-large`,
-        {
-          inputs: prompt,
-          parameters: {
-            max_length: 500,
-            temperature: 0.8,
-            do_sample: true,
-            num_return_sequences: 1
-          }
-        },
-        {
-          headers: {
-            'Authorization': `Bearer ${process.env.NEXT_PUBLIC_HUGGINGFACE_API_KEY || 'hf_demo'}`,
-            'Content-Type': 'application/json'
-          }
-        }
-      );
-
-      const generatedText = response.data[0]?.generated_text || '';
-      const questions = this.parseGeneratedQuestions(generatedText);
+      const apiKey = process.env.NEXT_PUBLIC_HUGGINGFACE_API_KEY;
+      console.log('Hugging Face API Key exists:', !!apiKey);
+      console.log('API Key starts with hf_:', apiKey?.startsWith('hf_'));
       
-      return { questions, success: true };
+      if (!apiKey) {
+        return { questions: [], success: false, error: 'Hugging Face API key not configured. Please add NEXT_PUBLIC_HUGGINGFACE_API_KEY to your .env.local file.' };
+      }
+
+      // Try multiple Hugging Face models in order of reliability
+      const models = ['gpt2', 'distilgpt2', 'microsoft/DialoGPT-small'];
+      let lastError = null;
+      
+      for (const model of models) {
+        try {
+          console.log(`Trying Hugging Face model: ${model}`);
+          const response = await axios.post(
+            `${this.HUGGINGFACE_API_URL}/${model}`,
+            {
+              inputs: prompt,
+              parameters: {
+                max_length: 150,
+                temperature: 0.9,
+                do_sample: true,
+                num_return_sequences: 1
+              }
+            },
+            {
+              headers: {
+                'Authorization': `Bearer ${apiKey}`,
+                'Content-Type': 'application/json'
+              },
+              timeout: 30000
+            }
+          );
+          
+          const generatedText = response.data[0]?.generated_text || '';
+          console.log(`Success with model ${model}, generated text:`, generatedText);
+          const questions = this.parseGeneratedQuestions(generatedText);
+          console.log('Parsed questions:', questions);
+          
+          return { questions, success: true };
+        } catch (error: any) {
+          console.log(`Model ${model} failed:`, error.response?.status, error.response?.data);
+          lastError = error;
+          continue; // Try next model
+        }
+      }
+      
+      // If all models failed, throw the last error
+      throw lastError;
     } catch (error: any) {
+      console.error('Hugging Face API Error:', error.response?.data || error.message);
+      
+      if (error.response?.status === 401) {
+        return { 
+          questions: [], 
+          success: false, 
+          error: 'Invalid Hugging Face API key. Please check your API key in .env.local file.' 
+        };
+      }
+      if (error.response?.status === 404) {
+        return { 
+          questions: [], 
+          success: false, 
+          error: 'Hugging Face model not found. Trying a different approach...' 
+        };
+      }
       if (error.response?.status === 503) {
         return { 
           questions: [], 
           success: false, 
           error: 'Hugging Face model is loading. Please try again in a few seconds.' 
+        };
+      }
+      if (error.response?.status === 429) {
+        return { 
+          questions: [], 
+          success: false, 
+          error: 'Hugging Face API rate limit exceeded. Please try again later.' 
         };
       }
       throw error;
@@ -258,9 +326,9 @@ export class AIService {
   // Get available AI providers
   static getAvailableProviders(): Array<{ id: string; name: string; free: boolean; requiresKey: boolean }> {
     return [
-      { id: 'huggingface', name: 'Hugging Face (Free)', free: true, requiresKey: false },
+      { id: 'huggingface', name: 'Hugging Face (Free) - Try This First', free: true, requiresKey: true },
+      { id: 'openrouter', name: 'OpenRouter (Free tier) - Recommended', free: true, requiresKey: true },
       { id: 'openai', name: 'OpenAI GPT-3.5', free: false, requiresKey: true },
-      { id: 'openrouter', name: 'OpenRouter (Free tier)', free: true, requiresKey: true },
       { id: 'cohere', name: 'Cohere (Free tier)', free: true, requiresKey: true }
     ];
   }

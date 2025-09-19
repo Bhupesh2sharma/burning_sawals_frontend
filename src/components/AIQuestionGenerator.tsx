@@ -70,11 +70,15 @@ export default function AIQuestionGenerator({ onQuestionGenerated }: AIQuestionG
         selectedProvider as any
       );
 
+      console.log('AI Service result:', result);
+      
       if (result.success) {
+        console.log('Questions received:', result.questions);
         if (result.questions.length > 0) {
           setGeneratedQuestions(result.questions);
           setSuccess(`Successfully generated ${result.questions.length} questions!`);
         } else {
+          console.log('No questions generated, using fallback');
           // Fallback to sample questions
           const sampleQuestions = AIService.generateSampleQuestions(selectedGenre);
           setGeneratedQuestions(sampleQuestions);
