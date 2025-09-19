@@ -1,15 +1,17 @@
 "use client";
-import React, { useEffect, useState } from "react";
-import { useParams } from "next/navigation";
+import React, { useEffect, useState, useRef } from "react";
+import { useParams, useRouter } from "next/navigation";
 import Image from "next/image";
 import { FiHome } from "react-icons/fi";
 import { BiSolidComment } from "react-icons/bi";
 import { AiOutlineLike, AiOutlineDislike } from "react-icons/ai";
 import { getAllQuestionTypes, getQuestionsByGenre, AnalyticsService } from "../../../utils/api";
 import { useAuth } from "../../../components/AuthProvider";
+import RouteGuard from "../../../components/RouteGuard";
 
 export default function QuestionTypePage() {
   const params = useParams();
+  const router = useRouter();
   const questionTypeId = params.id as string;
   const { token, isAuthenticated, user, logout } = useAuth();
 
@@ -26,6 +28,10 @@ export default function QuestionTypePage() {
   const [currentQuestionIdx, setCurrentQuestionIdx] = useState(0);
   const [interactionLoading, setInteractionLoading] = useState(false);
   const [interactionFeedback, setInteractionFeedback] = useState<string>("");
+  const [touchStart, setTouchStart] = useState<number | null>(null);
+  const [touchEnd, setTouchEnd] = useState<number | null>(null);
+  const [isSwiping, setIsSwiping] = useState(false);
+  const cardRef = useRef<HTMLDivElement>(null);
 
   // Fetch question type and its genres
   useEffect(() => {
@@ -89,6 +95,38 @@ export default function QuestionTypePage() {
     setCurrentQuestionIdx((idx) => (idx < questions.length - 1 ? idx + 1 : 0));
   };
 
+  // Touch/Swipe handlers
+  const minSwipeDistance = 50;
+
+  const onTouchStart = (e: React.TouchEvent) => {
+    setTouchEnd(null);
+    setTouchStart(e.targetTouches[0].clientX);
+    setIsSwiping(true);
+  };
+
+  const onTouchMove = (e: React.TouchEvent) => {
+    setTouchEnd(e.targetTouches[0].clientX);
+  };
+
+  const onTouchEnd = () => {
+    if (!touchStart || !touchEnd) return;
+    
+    const distance = touchStart - touchEnd;
+    const isLeftSwipe = distance > minSwipeDistance;
+    const isRightSwipe = distance < -minSwipeDistance;
+
+    if (isLeftSwipe) {
+      handleNext(); // Swipe left = next question
+    }
+    if (isRightSwipe) {
+      handlePrev(); // Swipe right = previous question
+    }
+    
+    setIsSwiping(false);
+    setTouchStart(null);
+    setTouchEnd(null);
+  };
+
   // Get current question
   const currentQuestion = questions[currentQuestionIdx];
 
@@ -148,9 +186,15 @@ export default function QuestionTypePage() {
 
   if (loading && !questionType) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-pink-100">
+      <div className="min-h-screen flex flex-col items-center justify-center bg-[#feedf2]">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#E63946] mx-auto mb-4"></div>
+          {/* Shimmer Loading Effect */}
+          <div className="relative w-64 h-8 bg-gray-200 rounded-lg mb-4 overflow-hidden">
+            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white to-transparent animate-shimmer"></div>
+          </div>
+          <div className="relative w-48 h-6 bg-gray-200 rounded-lg mb-4 overflow-hidden">
+            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white to-transparent animate-shimmer"></div>
+          </div>
           <p className="text-gray-600">Loading question type...</p>
         </div>
       </div>
@@ -174,14 +218,24 @@ export default function QuestionTypePage() {
   }
 
   return (
-    <div className="flex flex-col bg-[#feedf2]">
+    <RouteGuard>
+      <div className="flex flex-col bg-[#feedf2]">
+        {/* All Animation Styles */}
+        <style jsx>{`
+          @keyframes shimmer {
+            0% { transform: translateX(-100%); }
+            100% { transform: translateX(100%); }
+          }
+          .animate-shimmer {
+            animation: shimmer 1.5s infinite;
+          }
+          .genre-slider-container::-webkit-scrollbar {
+            display: none;
+          }
+        `}</style>
+      
       {/* Header with Home Icon and Question Type Title */}
-      <div className="relative w-full max-w-md lg:max-w-2xl mx-auto mt-4 mb-2" style={{ minHeight: 48 }}>
-        {/* Home Icon - Top Left */}
-        {/* <button type="button" className="absolute left-2 top-1/2 -translate-y-1/2 group">
-          <FiHome size={24} className="text-4xl text-gray-600 cursor-pointer" strokeWidth={3} />
-          <span className="absolute left-full top-1/2 -translate-y-1/2 ml-2 px-2 py-1 bg-black text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-20">Go to home</span>
-        </button> */}
+      <div className="relative w-full mx-auto mt-4 mb-2" style={{ minHeight: 48 }}>
         {/* Question Type Title - Centered */}
         <h1 className="text-2xl font-libre-bodoni text-black text-center absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 flex items-center gap-2 justify-center w-max">
           {questionType.type_name} <span>😉</span>
@@ -189,53 +243,110 @@ export default function QuestionTypePage() {
       </div>
 
       {/* Main Content Box (wraps category buttons and card) */}
-      <div className="flex flex-col items-center max-w-md lg:max-w-2xl mx-auto bg-[#E7E7E9] rounded-2xl p-4 mb-2">
+      <div className="flex flex-col items-center w-[390px] mx-auto bg-[#E7E7E9] rounded-t-2xl p-4 mb-2">
 
-        {/* Category Buttons */}
-        <div className="flex gap-2 justify-center mb-4 w-full max-w-xs lg:max-w-lg">
-          {questionType.genres?.map((genre: any) => (
+        {/* Category Buttons - Show max 3 with +X indicator */}
+        <div className="flex gap-2 justify-center mb-4 w-full">
+          {questionType.genres?.slice(0, 3).map((genre: any, index: number) => (
             <button
               key={genre.genre_id}
-              className={`flex-1 bg-[#CB2655] text-white rounded-lg px-4 py-2 text-xs font-semibold shadow font-sans ${selectedGenreId === genre.genre_id ? 'ring-2 ring-pink-400' : ''}`}
+              className={`w-[120px] bg-[#CB2655] text-white rounded-md px-4 py-2 text-xs font-semibold shadow font-sans transition-all duration-300 hover:scale-105 hover:shadow-lg ${selectedGenreId === genre.genre_id ? 'ring-2 ring-pink-400' : 'hover:bg-[#B01E4A]'}`}
               onClick={() => setSelectedGenreId(genre.genre_id)}
             >
               {genre.name.charAt(0).toUpperCase() + genre.name.slice(1)}
             </button>
           ))}
+          {questionType.genres && questionType.genres.length > 3 && (
+            <button
+              className="w-[120px] bg-gray-400 text-white rounded-md px-4 py-2 text-sm font-semi-bold font-libre-bodoni shadow  cursor-pointer hover:bg-gray-500 transition-all duration-300 hover:scale-105 hover:shadow-lg"
+              onClick={() => {
+                // Toggle showing all genres
+                const slider = document.querySelector('.genre-slider-container') as HTMLElement | null;
+                if (slider) {
+                  slider.style.display = slider.style.display === 'none' ? 'block' : 'none';
+                }
+              }}
+            >
+              +{questionType.genres.length - 3}
+            </button>
+          )}
         </div>
-        {/* Card */}
-        <div className="relative rounded-md w-full max-w-xs lg:max-w-5xl mx-auto px-4 py-8 flex flex-col items-center min-h-[350px] h-[45vh] shadow-lg" style={{ backgroundColor: '#CB2655' }}>
+        
+        {/* Hidden slider container for all genres */}
+        <div className="w-full overflow-x-auto mb-4 genre-slider-container hidden" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+          <div className="flex gap-2 min-w-max">
+            {questionType.genres?.map((genre: any) => (
+              <button
+                key={genre.genre_id}
+                className={`flex-shrink-0 w-[120px] bg-[#CB2655] text-white rounded-md px-4 py-2 text-xs font-semibold shadow font-sans ${selectedGenreId === genre.genre_id ? 'ring-2 ring-pink-400' : ''}`}
+                onClick={() => setSelectedGenreId(genre.genre_id)}
+              >
+                {genre.name.charAt(0).toUpperCase() + genre.name.slice(1)}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+      
+       <div 
+         ref={cardRef}
+         className={`relative rounded-md w-[390px] mx-auto px-4 py-8 flex flex-col items-center min-h-[350px] h-[45vh] shadow-lg transition-transform duration-300 ${isSwiping ? 'scale-95' : 'scale-100'}`}
+         style={{ backgroundColor: '#CB2655' }}
+         onTouchStart={onTouchStart}
+         onTouchMove={onTouchMove}
+         onTouchEnd={onTouchEnd}
+       >
+          {/* Home Icon - Top Left of Card */}
+          <button 
+            onClick={() => router.push('/home')}
+            className="absolute top-4 left-4 z-20 group"
+          >
+            <FiHome size={20} className="text-white cursor-pointer hover:text-gray-200 transition-all duration-300 hover:scale-110" strokeWidth={3} />
+            <span className="absolute left-full top-1/2 -translate-y-1/2 ml-2 px-2 py-1 bg-black text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-30">Go to home</span>
+          </button>
+          
           {/* Top label and icon1.png */}
           <div className="ml-auto relative z-10">
             <Image src="/icon1.png" alt="icon1" width={42} height={42} />
           </div>
           <div className="flex w-full items-center mb-8 relative">
             <div className="flex-1 flex justify-center absolute left-0 right-0">
-              <span className="text-white text-lg font-libre-bodoni text-center w-full">
-                {loading ? 'Loading...' : currentQuestion?.prompt || 'No questions found for this genre.'}
-              </span>
+              {loading ? (
+                <div className="relative w-full h-6 bg-white/20 rounded-lg overflow-hidden">
+                  <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent animate-shimmer"></div>
+                </div>
+              ) : (
+                <span className="text-white text-lg text-2xl font-semi-bold font-libre-bodoni text-2xl font-semi-bold text-center w-full">
+                  {currentQuestion?.prompt || 'No questions found for this genre.'}
+                </span>
+              )}
             </div>
           </div>
           {/* Question and arrows */}
           <div className="flex-1 flex items-center justify-center w-full relative">
-            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-3xl text-white cursor-pointer select-none" onClick={handlePrev}>&#60;</span>
-            <span className="text-white text-center text-xl font-libre-bodoni px-2 mx-8 block w-full">
-              {currentQuestion?.question || ''}
-            </span>
-            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-3xl text-white cursor-pointer select-none" onClick={handleNext}>&#62;</span>
+            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-3xl text-white cursor-pointer select-none hover:scale-110 transition-transform" onClick={handlePrev}>&#60;</span>
+            {loading ? (
+              <div className="relative w-full h-8 bg-white/20 rounded-lg overflow-hidden mx-8">
+                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent animate-shimmer"></div>
+              </div>
+            ) : (
+              <span className="text-white text-center text-xl font-libre-bodoni px-2 mx-8 block w-full">
+                {currentQuestion?.question || ''}
+              </span>
+            )}
+            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-3xl text-white cursor-pointer select-none hover:scale-110 transition-transform" onClick={handleNext}>&#62;</span>
           </div>
           {/* Heart icon */}
           <div className="w-full flex justify-center mt-8">
             <Image src="/icon2.png" alt="love" width={40} height={40} />
           </div>
         </div>
-      </div>
 
       {/* Bottom Navigation Bar - custom icons as buttons */}
       <nav className="flex justify-between items-center px-4 py-2 max-w-xs lg:max-w-lg mx-auto w-full mb-2">
         <button 
           type="button"
-          className="opacity-50 cursor-not-allowed"
+          className="opacity-50 cursor-not-allowed drop-shadow-lg"
           title="Comment feature coming soon"
         >
           <BiSolidComment size={46} color="#D0BCFF" />
@@ -245,7 +356,7 @@ export default function QuestionTypePage() {
             type="button"
             onClick={() => handleInteraction('like')}
             disabled={interactionLoading || !currentQuestion}
-            className={`transition-opacity ${interactionLoading ? 'opacity-50' : 'hover:opacity-80'}`}
+            className={`transition-opacity drop-shadow-lg ${interactionLoading ? 'opacity-50' : 'hover:opacity-80'}`}
             title="Like this question"
           >
             <AiOutlineLike size={40} />
@@ -254,7 +365,7 @@ export default function QuestionTypePage() {
             type="button"
             onClick={() => handleInteraction('super_like')}
             disabled={interactionLoading || !currentQuestion}
-            className={`transition-opacity ${interactionLoading ? 'opacity-50' : 'hover:opacity-80'}`}
+            className={`transition-opacity drop-shadow-lg ${interactionLoading ? 'opacity-50' : 'hover:opacity-80'}`}
             title="Super like this question"
           >
             <Image src="/icon4.png" alt="fire" width={40} height={40} />
@@ -264,7 +375,7 @@ export default function QuestionTypePage() {
           type="button"
           onClick={() => handleInteraction('dislike')}
           disabled={interactionLoading || !currentQuestion}
-          className={`transition-opacity ${interactionLoading ? 'opacity-50' : 'hover:opacity-80'}`}
+          className={`transition-opacity drop-shadow-lg ${interactionLoading ? 'opacity-50' : 'hover:opacity-80'}`}
           title="Dislike this question"
         >
           <AiOutlineDislike size={40} />
@@ -280,9 +391,10 @@ export default function QuestionTypePage() {
 
 
       {/* Footer */}
-      <footer className="py-2 text-center  text-lg text-black font-serif">
+      <footer className="py-2 text-center  text-2xl font-semi-bold text-black font-libre-bodoni">
         Designed to deepen human connection
       </footer>
-    </div>
+      </div>
+    </RouteGuard>
   );
 }

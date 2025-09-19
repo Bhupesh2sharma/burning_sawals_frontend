@@ -1,6 +1,7 @@
 import axios from "axios";
 
-export const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
+const BASE_URL = "http://localhost:8080/api";
+export const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || BASE_URL;
 
 export async function apiFetch(path: string, options: RequestInit = {}) {
     const url = path.startsWith("http") ? path : `${API_BASE_URL}${path}`;
@@ -78,8 +79,6 @@ export const removeGenresFromQuestionType = (
         body: JSON.stringify(data),
     });
 
-const BASE_URL = "http://localhost:8080/api";
-
 export const TOKEN_KEY = "auth_token";
 export const tokenStorage = {
     set: (token: string) => localStorage.setItem(TOKEN_KEY, token),
@@ -122,27 +121,36 @@ export interface AuthContextType {
 
 export class AuthService {
     static async sendOTP(phone_number: string, captcha_token: string) {
-        return axios.post(`${BASE_URL}/auth/phone/send-otp`, {
+        const payload = {
             phone_number,
             captcha_token,
+        };
+        
+        console.log("AuthService.sendOTP sending payload:", {
+            phone_number,
+            captcha_token: captcha_token ? `${captcha_token.substring(0, 20)}...` : 'null',
+            captcha_token_length: captcha_token?.length,
+            api_url: `${API_BASE_URL}/auth/phone/send-otp`
         });
+        
+        return axios.post(`${API_BASE_URL}/auth/phone/send-otp`, payload);
     }
     static async verifyOTP(
         phone_number: string,
         otp: string,
         user_name?: string
     ) {
-        return axios.post(`${BASE_URL}/auth/phone/verify-otp`, {
+        return axios.post(`${API_BASE_URL}/auth/phone/verify-otp`, {
             phone_number,
             otp,
             user_name,
         });
     }
     static async checkUsername(user_name: string) {
-        return axios.post(`${BASE_URL}/auth/check-username`, { user_name });
+        return axios.post(`${API_BASE_URL}/auth/check-username`, { user_name });
     }
     static async testAuth(token: string) {
-        return axios.get(`${BASE_URL}/test`, {
+        return axios.get(`${API_BASE_URL}/test`, {
             headers: { Authorization: `Bearer ${token}` },
         });
     }
@@ -157,7 +165,7 @@ export class AnalyticsService {
     }
     
     const cleanToken = token.trim();
-    return axios.post(`${BASE_URL}/analytics/questions/${questionId}/interact`, 
+    return axios.post(`${API_BASE_URL}/analytics/questions/${questionId}/interact`, 
       { interaction_type: interactionType },
       { 
         headers: { 
@@ -174,7 +182,7 @@ export class AnalyticsService {
     }
     
     const cleanToken = token.trim();
-    return axios.delete(`${BASE_URL}/analytics/questions/${questionId}/interact`, 
+    return axios.delete(`${API_BASE_URL}/analytics/questions/${questionId}/interact`, 
       { 
         data: { interaction_type: interactionType },
         headers: { 
@@ -186,14 +194,14 @@ export class AnalyticsService {
   }
 
   static async getUserInteractionsForQuestion(questionId: string, token: string) {
-    return axios.get(`${BASE_URL}/analytics/questions/${questionId}/interactions`, {
+    return axios.get(`${API_BASE_URL}/analytics/questions/${questionId}/interactions`, {
       headers: { Authorization: `Bearer ${token}` }
     });
   }
 
   // Question Analytics
   static async getQuestionAnalytics(questionId: string, token: string) {
-    return axios.get(`${BASE_URL}/analytics/questions/${questionId}`, {
+    return axios.get(`${API_BASE_URL}/analytics/questions/${questionId}`, {
       headers: { Authorization: `Bearer ${token}` }
     });
   }
@@ -216,7 +224,7 @@ export class AnalyticsService {
   // User Analytics - Get all users analytics
   static async getAllUsersAnalytics(token: string) {
     try {
-      return await axios.get(`${BASE_URL}/analytics/users`, {
+      return await axios.get(`${API_BASE_URL}/analytics/users`, {
         headers: { Authorization: `Bearer ${token}` }
       });
     } catch (error: any) {
@@ -231,7 +239,7 @@ export class AnalyticsService {
   static async getUserAnalytics(token: string) {
     try {
       // Since we don't have a /me endpoint, we'll get all users and filter
-      const response = await axios.get(`${BASE_URL}/analytics/users`, {
+      const response = await axios.get(`${API_BASE_URL}/analytics/users`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       
@@ -287,19 +295,19 @@ export class AnalyticsService {
 
   // Monitoring APIs
   static async getSystemHealth(token: string) {
-    return axios.get(`${BASE_URL}/monitoring/health`, {
+    return axios.get(`${API_BASE_URL}/monitoring/health`, {
       headers: { Authorization: `Bearer ${token}` }
     });
   }
 
   static async getDailyStats(token: string) {
-    return axios.get(`${BASE_URL}/monitoring/daily-stats`, {
+    return axios.get(`${API_BASE_URL}/monitoring/daily-stats`, {
       headers: { Authorization: `Bearer ${token}` }
     });
   }
 
   static async getMetrics(token: string) {
-    return axios.get(`${BASE_URL}/monitoring/metrics`, {
+    return axios.get(`${API_BASE_URL}/monitoring/metrics`, {
       headers: { Authorization: `Bearer ${token}` }
     });
   }

@@ -1,26 +1,18 @@
 "use client";
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState } from "react";
 import { useForm } from "react-hook-form";
 import { useAuth } from "../../components/AuthProvider";
 import { useRouter } from "next/navigation";
-import RecaptchaV3 from "../../components/RecaptchaV3";
-import { executeRecaptchaV3 } from "../../components/RecaptchaV3";
 
-declare global {
-    interface Window {
-        grecaptcha: any;
-    }
-}
 
 export default function PhoneNumberPage() {
     const [apiError, setApiError] = useState("");
     const [loading, setLoading] = useState(false);
     const [otpSent, setOtpSent] = useState(false);
     const [isExistingUser, setIsExistingUser] = useState<boolean | null>(null);
-    const [captchaError, setCaptchaError] = useState("");
-    const [recaptchaReady, setRecaptchaReady] = useState(false);
     const { sendOTP } = useAuth();
     const router = useRouter();
+
     const {
         register,
         handleSubmit,
@@ -29,54 +21,15 @@ export default function PhoneNumberPage() {
         defaultValues: { phone: "" },
     });
 
-    // Debug: Log validation errors
-    useEffect(() => {
-        console.log("Form errors:", errors);
-    }, [errors]);
 
     const onSubmit = async (data: any) => {
-        console.log("onSubmit called with:", data);
-        console.log("recaptchaReady:", recaptchaReady);
         setApiError("");
-        setCaptchaError("");
         setLoading(true);
 
-        // For reCAPTCHA v3, we need to execute it when the form is submitted
-        let captchaToken: string;
         try {
-            if (!recaptchaReady) {
-                setCaptchaError(
-                    "Security verification is still loading. Please wait a moment."
-                );
-                setLoading(false);
-                return;
-            }
-
-            console.log("Executing reCAPTCHA v3 for form submission...");
-            captchaToken = await executeRecaptchaV3(
-                process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY ||
-                    "6LeIxAcTAAAAAJcZVRqyHh71UMIEGNQ_MXjiZKhI",
-                "submit"
-            );
-            console.log("reCAPTCHA token obtained:", captchaToken);
-        } catch (error) {
-            console.error("reCAPTCHA execution error:", error);
-            setCaptchaError("Security verification failed. Please try again.");
-            setLoading(false);
-            return;
-        }
-
-        try {
-            console.log(
-                "Sending OTP to:",
-                data.phone,
-                "with token:",
-                captchaToken
-            );
-            const result = await sendOTP(data.phone, captchaToken);
+            const result = await sendOTP(data.phone, "");
 
             if (result.success) {
-                console.log("OTP sent successfully");
                 setOtpSent(true);
                 setIsExistingUser(result.is_existing_user || false);
                 localStorage.setItem("auth_phone", data.phone);
@@ -89,13 +42,13 @@ export default function PhoneNumberPage() {
                 setApiError(result.message);
             }
         } catch (err: any) {
-            console.error("Error sending OTP:", err);
-            
             // Handle different types of errors
             if (err.response?.status === 429) {
                 setApiError("Too many requests. Please wait a few minutes before trying again.");
             } else if (err.response?.data?.message) {
-                setApiError(err.response.data.message);
+                setApiError(`Backend Error: ${err.response.data.message}`);
+            } else if (err.response?.data?.error) {
+                setApiError(`Backend Error: ${err.response.data.error}`);
             } else {
                 setApiError("Failed to send OTP. Please try again.");
             }
@@ -104,29 +57,26 @@ export default function PhoneNumberPage() {
         }
     };
 
-    const handleCaptchaError = (error: string) => {
-        setCaptchaError(error);
-    };
 
-    const handleRecaptchaReady = () => {
-        console.log("reCAPTCHA is ready");
-        setRecaptchaReady(true);
-    };
 
     return (
         <div className="min-h-screen flex flex-col items-center justify-center bg-pink-100">
-            <div className="bg-white p-8 rounded shadow-md w-full max-w-md flex flex-col items-center">
-                <h1 className="text-3xl font-bold text-rose-700 mb-6">
-                    Login / Register
+            <div className=" p-8  w-full max-w-md flex flex-col items-center">
+                <h1 className="text-3xl font-bold text-rose-700 mb-6 font-quicksand">
+                    Sign in / Register
                 </h1>
                 <form
                     onSubmit={handleSubmit(onSubmit)}
                     className="w-full flex flex-col gap-4"
                 >
-                    <input
-                        type="tel"
-                        placeholder="Enter your phone number"
-                        className="border rounded px-4 py-2 w-full"
+                    <div className="w-full">
+                        <label className="text-xl text-rose-700 mb-2 font-quicksand block">
+                            Phone No. -
+                        </label>
+                        <input
+                            type="tel"
+                            placeholder=""
+                            className="bg-gray-200 rounded-lg px-4 py-3 w-full text-lg font-quicksand"
                         {...register("phone", {
                             required: "Phone number is required",
                             validate: (value) => {
@@ -141,64 +91,36 @@ export default function PhoneNumberPage() {
                                 }
                                 return true;
                             },
-                        })}
-                        disabled={loading || otpSent}
-                    />
+                            })}
+                            disabled={loading || otpSent}
+                        />
+                    </div>
                     {errors.phone && (
-                        <span className="text-red-500 text-sm">
+                        <span className="text-red-500 text-sm font-quicksand">
                             {errors.phone.message as string}
                         </span>
                     )}
 
-                    {/* reCAPTCHA v3 Component */}
-                    <RecaptchaV3
-                        siteKey={
-                            process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY ||
-                            "6LeIxAcTAAAAAJcZVRqyHh71UMIEGNQ_MXjiZKhI"
-                        }
-                        onVerify={() => {}} // Not used since we execute manually
-                        onError={handleCaptchaError}
-                        onReady={handleRecaptchaReady}
-                    />
-                    {captchaError && (
-                        <div className="text-red-500 text-sm text-center">
-                            {captchaError}
-                        </div>
-                    )}
 
                     <button
                         type="submit"
-                        className="bg-rose-700 text-white py-2 rounded font-semibold hover:bg-rose-800 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="bg-rose-700 text-pink-100 py-3 px-6 rounded-lg font-bold font-quicksand text-2xl hover:bg-rose-800 transition disabled:opacity-50 disabled:cursor-not-allowed w-full"
                         disabled={loading || otpSent}
-                        onClick={() =>
-                            console.log(
-                                "Button clicked, loading:",
-                                loading,
-                                "otpSent:",
-                                otpSent
-                            )
-                        }
                     >
                         {loading ? "Sending..." : "Send OTP"}
                     </button>
+                    
                     {apiError && (
-                        <div className="text-red-600 text-sm text-center">
+                        <div className="text-red-600 text-sm text-center font-quicksand">
                             {apiError}
                         </div>
                     )}
                     {otpSent && (
-                        <div className="text-green-600 text-sm text-center">
+                        <div className="text-green-600 text-sm text-center font-quicksand">
                             OTP sent! Please check your phone.
                         </div>
                     )}
                 </form>
-                <div className="mt-4 text-xs text-gray-500">
-                    By continuing, you agree to our{" "}
-                    <a href="#" className="underline">
-                        Terms and Conditions
-                    </a>
-                    .
-                </div>
             </div>
         </div>
     );

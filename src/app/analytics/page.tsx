@@ -2,6 +2,7 @@
 import React, { useEffect, useState } from "react";
 import { AnalyticsService } from "../../utils/api";
 import { useAuth } from "../../components/AuthProvider";
+import RouteGuard from "../../components/RouteGuard";
 
 interface QuestionAnalytics {
   question_id: number;
@@ -220,7 +221,8 @@ export default function AnalyticsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-100 flex flex-col">
+    <RouteGuard>
+      <div className="min-h-screen bg-gray-100 flex flex-col">
       {/* Header */}
       <div className="bg-gray-200 py-2 px-4 text-center font-medium text-sm border-b">Admin Analytics</div>
       
@@ -532,6 +534,7 @@ export default function AnalyticsPage() {
           </div>
         </main>
       </div>
-    </div>
+      </div>
+    </RouteGuard>
   );
 }

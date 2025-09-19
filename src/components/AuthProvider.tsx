@@ -66,10 +66,19 @@ export default function AuthProvider({ children }: { children: ReactNode }) {
 
     const sendOTP = async (phoneNumber: string, captchaToken: string) => {
         try {
+            console.log("AuthProvider sendOTP called with:", {
+                phoneNumber,
+                captchaToken: captchaToken ? `${captchaToken.substring(0, 20)}...` : 'null',
+                captchaTokenLength: captchaToken?.length
+            });
+            
             const response = await AuthService.sendOTP(
                 phoneNumber,
                 captchaToken
             );
+            
+            console.log("AuthService.sendOTP response:", response);
+            
             return {
                 success: true,
                 message: response.data.message,
@@ -77,9 +86,13 @@ export default function AuthProvider({ children }: { children: ReactNode }) {
                 is_existing_user: response.data.data.is_existing_user,
             };
         } catch (error: any) {
+            console.error("AuthProvider sendOTP error:", error);
+            console.error("Error response data:", error.response?.data);
+            console.error("Error response status:", error.response?.status);
+            
             return {
                 success: false,
-                message: error.response?.data?.message || "Failed to send OTP",
+                message: error.response?.data?.message || error.response?.data?.error || "Failed to send OTP",
             };
         }
     };

@@ -6,6 +6,7 @@ import { BiSolidComment } from "react-icons/bi";
 import { AiOutlineLike, AiOutlineDislike } from "react-icons/ai";
 import { getAllQuestionTypes, getQuestionsByGenre, AnalyticsService } from "../../utils/api";
 import { useAuth } from "../../components/AuthProvider";
+import RouteGuard from "../../components/RouteGuard";
 
 export default function QuestionTypePage() {
   const { token, isAuthenticated, logout } = useAuth();
@@ -109,7 +110,8 @@ export default function QuestionTypePage() {
   }
 
   return (
-    <div className="flex flex-col bg-[#feedf2]">
+    <RouteGuard>
+      <div className="flex flex-col bg-[#feedf2]">
       {/* Header above card, aligned with card container */}
       <div className="relative w-full max-w-md mx-auto mt-4 mb-2" style={{ minHeight: 48 }}>
         <button type="button" className="absolute left-2 top-1/2 -translate-y-1/2 group">
@@ -270,6 +272,7 @@ export default function QuestionTypePage() {
       <footer className="py-2 text-center text-lg text-white font-libre-bodoni">
         Burning Sawals 🔥
       </footer>
-    </div>
+      </div>
+    </RouteGuard>
   );
 }

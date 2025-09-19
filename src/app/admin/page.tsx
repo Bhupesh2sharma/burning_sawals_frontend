@@ -1,6 +1,8 @@
 "use client";
-import React, { useState } from "react";
-import { createQuestionType, getAllQuestionTypes, renameQuestionType, deleteQuestionType, createGenre, getGenres, renameGenreById, deleteGenreById, createQuestion, getQuestionsByGenre, updateQuestion, getAllQuestions } from "../../utils/api";
+import React, { useState, useEffect } from "react";
+import { createQuestionType, getAllQuestionTypes, renameQuestionType, deleteQuestionType, createGenre, getGenres, renameGenreById, deleteGenreById, createQuestion, getQuestionsByGenre, updateQuestion, getAllQuestions, AnalyticsService } from "../../utils/api";
+import { useAuth } from "../../components/AuthProvider";
+import AIQuestionGenerator from "../../components/AIQuestionGenerator";
 
 const categories = ["For First Dates", "For Friends", "For Family"];
 const starters = ["Conversation Starters", "Deep Questions", "Fun Prompts"];
@@ -29,7 +31,7 @@ const dummyUsers = [
 ];
 
 export default function AdminPage() {
-  const [selectedSection, setSelectedSection] = useState("Users");
+  const [selectedSection, setSelectedSection] = useState("Add Questions");
   const [selectedCategory, setSelectedCategory] = useState(categories[0]);
   const [selectedStarter, setSelectedStarter] = useState(starters[0]);
   const [showAddQuestion, setShowAddQuestion] = useState(false);
@@ -72,6 +74,21 @@ export default function AdminPage() {
   const [editingGenreIds, setEditingGenreIds] = useState<number[]>([]);
   const [questionEditStatus, setQuestionEditStatus] = useState<{success?: string, error?: string}>({});
 
+  // Analytics state
+  const { token, isAuthenticated } = useAuth();
+  const [analyticsData, setAnalyticsData] = useState({
+    questions: [] as any[],
+    userAnalytics: null as any,
+    allUsers: [] as any[],
+    topQuestions: [] as any[],
+    systemStats: null as any
+  });
+  const [analyticsLoading, setAnalyticsLoading] = useState(false);
+  const [analyticsError, setAnalyticsError] = useState("");
+  const [activeAnalyticsTab, setActiveAnalyticsTab] = useState<'overview' | 'questions' | 'users' | 'top'>('overview');
+  const [analyticsSortBy, setAnalyticsSortBy] = useState<'total_interactions' | 'likes' | 'super_likes' | 'dislikes' | 'created_at'>('total_interactions');
+  const [analyticsSortOrder, setAnalyticsSortOrder] = useState<'asc' | 'desc'>('desc');
+
   // Fetch all questions using getAllQuestions
   const fetchAllQuestions = async () => {
     setLoadingQuestions(true);
@@ -90,6 +107,13 @@ export default function AdminPage() {
   React.useEffect(() => {
     fetchAllQuestions();
   }, []);
+
+  // Fetch analytics data when Analytics section is selected
+  React.useEffect(() => {
+    if (selectedSection === "Analytics" && isAuthenticated && token) {
+      fetchAnalyticsData();
+    }
+  }, [selectedSection, isAuthenticated, token, analyticsSortBy, analyticsSortOrder]);
 
   // Update handleAddQuestion to refresh questions after adding
   const handleAddQuestion = async (e: React.FormEvent) => {
@@ -149,6 +173,24 @@ export default function AdminPage() {
     }
   };
 
+  // Handle AI-generated questions
+  const handleAddAIGeneratedQuestion = async (question: string, prompt: string, genreIds: number[]) => {
+    setAddQuestionStatus({});
+    const payload = {
+      question: question,
+      prompt: prompt,
+      genre_ids: genreIds,
+    };
+    console.log('Adding AI-generated question:', payload);
+    try {
+      await createQuestion(payload);
+      setAddQuestionStatus({ success: "AI-generated question added!" });
+      fetchAllQuestions(); // Refresh the questions list
+    } catch (err) {
+      setAddQuestionStatus({ error: "Failed to add AI-generated question." });
+    }
+  };
+
   // UI state for nav bar
   const [activeAdminTab, setActiveAdminTab] = useState('add-question');
 
@@ -166,7 +208,7 @@ export default function AdminPage() {
     }
   };
 
-  const handleRenameType = async (id) => {
+  const handleRenameType = async (id: string) => {
     setRenameStatus({});
     try {
       await renameQuestionType(id, { type_name: renameTypeName });
@@ -179,7 +221,7 @@ export default function AdminPage() {
     }
   };
 
-  const handleDeleteType = async (type_id) => {
+  const handleDeleteType = async (type_id: string) => {
     setRenameStatus({});
     try {
       await deleteQuestionType(type_id);
@@ -204,7 +246,7 @@ export default function AdminPage() {
     }
   };
 
-  const handleCreateGenre = async (e) => {
+  const handleCreateGenre = async (e: React.FormEvent) => {
     e.preventDefault();
     setAddGenreStatus({});
     try {
@@ -219,7 +261,7 @@ export default function AdminPage() {
     }
   };
 
-  const handleRenameGenre = async (id) => {
+  const handleRenameGenre = async (id: string) => {
     setGenreStatus({});
     try {
       await renameGenreById(id, { genre_name: renameGenreName });
@@ -232,7 +274,7 @@ export default function AdminPage() {
     }
   };
 
-  const handleDeleteGenre = async (id) => {
+  const handleDeleteGenre = async (id: string) => {
     setGenreStatus({});
     try {
       await deleteGenreById(id);
@@ -264,19 +306,110 @@ export default function AdminPage() {
     } catch {}
   };
 
+  // Analytics functions
+  const fetchAnalyticsData = async () => {
+    if (!isAuthenticated || !token) {
+      setAnalyticsError("Please login to view analytics");
+      return;
+    }
+
+    try {
+      setAnalyticsLoading(true);
+      setAnalyticsError("");
+
+      // Fetch all data in parallel
+      const [
+        questionsResponse,
+        userResponse,
+        allUsersResponse,
+        topQuestionsResponse,
+        healthResponse,
+        statsResponse
+      ] = await Promise.allSettled([
+        AnalyticsService.getAllQuestionsWithAnalytics(token, 1, 50, analyticsSortBy, analyticsSortOrder),
+        AnalyticsService.getUserAnalytics(token),
+        AnalyticsService.getAllUsersAnalytics(token),
+        AnalyticsService.getTopQuestions(token, 'total', 10),
+        AnalyticsService.getSystemHealth(token),
+        AnalyticsService.getDailyStats(token)
+      ]);
+
+      // Handle questions data
+      let questionsData: any[] = [];
+      if (questionsResponse.status === 'fulfilled') {
+        questionsData = questionsResponse.value.data?.data?.items || questionsResponse.value.data?.data || [];
+      }
+
+      // Handle user analytics
+      let userAnalyticsData: any = null;
+      if (userResponse.status === 'fulfilled') {
+        const userData = userResponse.value.data?.data || userResponse.value.data;
+        if (userData) {
+          userAnalyticsData = {
+            user_id: userData.user_id,
+            total_likes_given: userData.likes || 0,
+            total_super_likes_given: userData.super_likes || 0,
+            total_dislikes_given: userData.dislikes || 0,
+            total_interactions_given: userData.total_interactions || 0,
+            last_updated: userData.last_active || new Date().toISOString()
+          };
+        }
+      }
+
+      // Handle all users data
+      let allUsersData: any[] = [];
+      if (allUsersResponse.status === 'fulfilled') {
+        allUsersData = allUsersResponse.value.data?.data || allUsersResponse.value.data || [];
+      }
+
+      // Handle top questions
+      let topQuestionsData: any[] = [];
+      if (topQuestionsResponse.status === 'fulfilled') {
+        const responseData = topQuestionsResponse.value.data?.data || topQuestionsResponse.value.data;
+        topQuestionsData = Array.isArray(responseData) ? responseData : (responseData?.items || []);
+      }
+
+      // Handle system stats
+      let systemStatsData: any = null;
+      if (statsResponse.status === 'fulfilled') {
+        systemStatsData = {
+          total_users: statsResponse.value.data?.total_users || 0,
+          total_questions: statsResponse.value.data?.total_questions || 0,
+          total_interactions: statsResponse.value.data?.total_interactions || 0,
+          daily_active_users: statsResponse.value.data?.daily_active_users || 0,
+          system_health: healthResponse.status === 'fulfilled' ? healthResponse.value.data?.status || 'unknown' : 'unknown',
+          database_status: healthResponse.status === 'fulfilled' ? healthResponse.value.data?.database || 'unknown' : 'unknown'
+        };
+      }
+
+      setAnalyticsData({
+        questions: questionsData,
+        userAnalytics: userAnalyticsData,
+        allUsers: allUsersData,
+        topQuestions: topQuestionsData,
+        systemStats: systemStatsData
+      });
+    } catch (error) {
+      console.error('Error fetching analytics:', error);
+      setAnalyticsError("Failed to load analytics data");
+    } finally {
+      setAnalyticsLoading(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gray-100 flex flex-col">
       {/* Header */}
-      <div className="bg-gray-200 py-2 px-4 text-center font-medium text-sm border-b">Admin</div>
+      <div className="bg-pink-200 py-2 px-4 text-center font-medium text-sm border">Hey, Admin How you doing today ?</div>
       <div className="flex flex-1">
         {/* Sidebar */}
         <aside className="w-48 bg-white border-r flex flex-col pt-6">
-          <button
+          {/* <button
             className={`text-left px-6 py-2 text-gray-700 hover:bg-gray-100 ${selectedSection === "Users" ? "font-semibold bg-gray-100 border-l-4 border-pink-400" : ""}`}
             onClick={() => setSelectedSection("Users")}
           >
             Users
-          </button>
+          </button> */}
           <button
             className={`text-left px-6 py-2 text-gray-700 hover:bg-gray-100 ${selectedSection === "Add Questions" ? "font-semibold bg-gray-100 border-l-4 border-pink-400" : ""}`}
             onClick={() => setSelectedSection("Add Questions")}
@@ -292,7 +425,7 @@ export default function AdminPage() {
         </aside>
         {/* Main Content */}
         <main className="flex-1 p-8">
-          {selectedSection === "Users" && (
+          {/* {selectedSection === "Users" && (
             <div className="overflow-x-auto bg-white rounded shadow">
               <table className="min-w-full text-sm">
                 <thead>
@@ -325,28 +458,19 @@ export default function AdminPage() {
                 </tbody>
               </table>
             </div>
-          )}
+          )} */}
           {selectedSection === "Add Questions" && (
             <>
               {/* Admin Action Nav Bar */}
               <div className="flex gap-2 mb-6 border-b pb-2">
-                <button
-                  className={`px-4 py-2 rounded-t font-medium ${activeAdminTab === 'add-question' ? 'bg-pink-500 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`}
-                  onClick={async () => {
-                    setActiveAdminTab('add-question');
-                    await fetchGenresForQuestions();
-                  }}
-                >
-                  Add Question
-                </button>
-                <button
-                  className={`px-4 py-2 rounded-t font-medium ${activeAdminTab === 'add-question-type' ? 'bg-pink-500 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`}
+              <button
+                  className={`px-4 py-2 rounded-t font-medium ${activeAdminTab === 'add-question-type' ? 'bg-pink-400 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`}
                   onClick={() => setActiveAdminTab('add-question-type')}
                 >
                   Add Question Type
                 </button>
                 <button
-                  className={`px-4 py-2 rounded-t font-medium ${activeAdminTab === 'view-question-types' ? 'bg-pink-500 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`}
+                  className={`px-4 py-2 rounded-t font-medium ${activeAdminTab === 'view-question-types' ? 'bg-pink-400 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`}
                   onClick={async () => {
                     setActiveAdminTab('view-question-types');
                     setLoadingTypes(true);
@@ -365,7 +489,7 @@ export default function AdminPage() {
                   View All Question Types
                 </button>
                 <button
-                  className={`px-4 py-2 rounded-t font-medium ${activeAdminTab === 'add-genre' ? 'bg-pink-500 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`}
+                  className={`px-4 py-2 rounded-t font-medium ${activeAdminTab === 'add-genre' ? 'bg-pink-400 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`}
                   onClick={async () => {
                     setActiveAdminTab('add-genre');
                     try {
@@ -377,7 +501,7 @@ export default function AdminPage() {
                   Add Genre
                 </button>
                 <button
-                  className={`px-4 py-2 rounded-t font-medium ${activeAdminTab === 'view-genres' ? 'bg-pink-500 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`}
+                  className={`px-4 py-2 rounded-t font-medium ${activeAdminTab === 'view-genres' ? 'bg-pink-400 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`}
                   onClick={async () => {
                     setActiveAdminTab('view-genres');
                     setLoadingGenres(true);
@@ -394,6 +518,21 @@ export default function AdminPage() {
                   }}
                 >
                   View All Genres
+                </button>
+                <button
+                  className={`px-4 py-2 rounded-t font-medium ${activeAdminTab === 'add-question' ? 'bg-pink-400 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`}
+                  onClick={async () => {
+                    setActiveAdminTab('add-question');
+                    await fetchGenresForQuestions();
+                  }}
+                >
+                  Add Question
+                </button>
+                <button
+                  className={`px-4 py-2 rounded-t font-medium ${activeAdminTab === 'ai-generator' ? 'bg-pink-400 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`}
+                  onClick={() => setActiveAdminTab('ai-generator')}
+                >
+                  🤖 AI Generator
                 </button>
               </div>
               {/* Only show the active section */}
@@ -427,14 +566,14 @@ export default function AdminPage() {
                   <form className="flex flex-col gap-2 mb-2 bg-white p-4 rounded shadow" onSubmit={handleAddQuestion}>
                 <input
                       className="border px-2 py-1 rounded"
-                      placeholder="Question (e.g. What is the derivative of x²?)"
+                      placeholder="Question"
                   value={newQuestion}
                   onChange={e => setNewQuestion(e.target.value)}
                       required
                     />
                 <input
                       className="border px-2 py-1 rounded"
-                      placeholder="Prompt (e.g. Remember to use the power rule...)"
+                      placeholder="Prompt "
                   value={newPrompt}
                   onChange={e => setNewPrompt(e.target.value)}
                       required
@@ -451,7 +590,7 @@ export default function AdminPage() {
                       ))}
                     </select>
                     <div className="flex gap-2">
-                      <button type="submit" className="bg-pink-500 text-white px-4 py-1 rounded hover:bg-pink-600 transition">Submit</button>
+                      <button type="submit" className="bg-pink-400 text-white px-4 py-1 rounded hover:bg-pink-600 transition">Submit</button>
               </div>
                   </form>
                   {addQuestionStatus.success && <div className="text-green-600 text-sm mt-1">{addQuestionStatus.success}</div>}
@@ -559,7 +698,7 @@ export default function AdminPage() {
                   >
                     <input
                       className="border px-2 py-1 rounded"
-                      placeholder="Type name (e.g. Multiple Choice)"
+                      placeholder="Type name "
                       value={questionTypeName}
                       onChange={e => setQuestionTypeName(e.target.value)}
                       required
@@ -567,7 +706,7 @@ export default function AdminPage() {
                     <div className="flex gap-2">
                       <button
                         type="submit"
-                        className="bg-pink-500 text-white px-4 py-1 rounded hover:bg-pink-600 transition"
+                        className="bg-pink-400 text-white px-4 py-1 rounded hover:bg-pink-600 transition"
                       >
                         Submit
                       </button>
@@ -621,7 +760,7 @@ export default function AdminPage() {
                                   onChange={e => setRenameTypeName(e.target.value)}
                                   required
                                 />
-                                <button type="submit" className="text-green-600 font-medium">Save</button>
+                                <button type="submit" className="text-pink-300 font-medium">Save</button>
                                 <button type="button" className="text-gray-500" onClick={() => setRenameTypeId(null)}>Cancel</button>
                               </form>
                             ) : (
@@ -665,7 +804,7 @@ export default function AdminPage() {
                   <form className="flex flex-col gap-2 mb-2 bg-white p-4 rounded shadow" onSubmit={handleCreateGenre}>
                     <input
                       className="border px-2 py-1 rounded"
-                      placeholder="Genre name (e.g. Geometry)"
+                      placeholder="Genre name "
                       value={genreName}
                       onChange={e => setGenreName(e.target.value)}
                       required
@@ -682,7 +821,7 @@ export default function AdminPage() {
                       ))}
                     </select>
                     <div className="flex gap-2">
-                      <button type="submit" className="bg-green-500 text-white px-4 py-1 rounded hover:bg-green-600 transition">Submit</button>
+                      <button type="submit" className="bg-pink-400 text-white px-4 py-1 rounded hover:bg-green-600 transition">Submit</button>
                       <button
                         type="button"
                         className="bg-gray-300 text-gray-700 px-4 py-1 rounded hover:bg-gray-400 transition"
@@ -773,6 +912,16 @@ export default function AdminPage() {
                   {genreStatus.error && <div className="text-red-600 text-sm mt-1">{genreStatus.error}</div>}
           </div>
               )}
+              {activeAdminTab === 'ai-generator' && (
+                <div className="mb-4">
+                  <AIQuestionGenerator 
+                    onQuestionGenerated={(question, prompt, genreIds) => {
+                      // Handle adding AI-generated question to the system
+                      handleAddAIGeneratedQuestion(question, prompt, genreIds);
+                    }}
+                  />
+          </div>
+              )}
               {/* Dropdowns */}
             
               {/* Add Question Section */}
@@ -786,37 +935,297 @@ export default function AdminPage() {
             </>
           )}
           {selectedSection === "Analytics" && (
-            <div className="overflow-x-auto bg-white rounded shadow">
+            <div className="bg-white rounded shadow">
+              {/* Analytics Header */}
+              <div className="bg-gray-200 py-2 px-4 text-center font-medium text-sm border-b">
+                Admin Analytics
+              </div>
+              
+              {/* Analytics Tabs */}
+              <div className="border-b">
+                <nav className="flex">
+                  <button
+                    onClick={() => setActiveAnalyticsTab('overview')}
+                    className={`px-6 py-3 text-sm font-medium ${
+                      activeAnalyticsTab === 'overview'
+                        ? 'border-b-2 border-pink-500 text-pink-600'
+                        : 'text-gray-500 hover:text-gray-700'
+                    }`}
+                  >
+                    Overview
+                  </button>
+                  <button
+                    onClick={() => setActiveAnalyticsTab('questions')}
+                    className={`px-6 py-3 text-sm font-medium ${
+                      activeAnalyticsTab === 'questions'
+                        ? 'border-b-2 border-pink-500 text-pink-600'
+                        : 'text-gray-500 hover:text-gray-700'
+                    }`}
+                  >
+                    Questions
+                  </button>
+                  <button
+                    onClick={() => setActiveAnalyticsTab('users')}
+                    className={`px-6 py-3 text-sm font-medium ${
+                      activeAnalyticsTab === 'users'
+                        ? 'border-b-2 border-pink-500 text-pink-600'
+                        : 'text-gray-500 hover:text-gray-700'
+                    }`}
+                  >
+                    Users
+                  </button>
+                  <button
+                    onClick={() => setActiveAnalyticsTab('top')}
+                    className={`px-6 py-3 text-sm font-medium ${
+                      activeAnalyticsTab === 'top'
+                        ? 'border-b-2 border-pink-500 text-pink-600'
+                        : 'text-gray-500 hover:text-gray-700'
+                    }`}
+                  >
+                    Top Questions
+                  </button>
+                </nav>
+              </div>
+
+              {/* Analytics Content */}
+              <div className="p-6">
+                {analyticsLoading ? (
+                  <div className="text-center py-8">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-pink-500 mx-auto mb-4"></div>
+                    <p className="text-gray-600">Loading analytics...</p>
+                  </div>
+                ) : analyticsError ? (
+                  <div className="text-center py-8">
+                    <p className="text-red-600 mb-4">{analyticsError}</p>
+                    <button 
+                      onClick={fetchAnalyticsData}
+                      className="px-4 py-2 bg-pink-500 text-white rounded hover:bg-pink-600"
+                    >
+                      Retry
+                    </button>
+                  </div>
+                ) : (
+                  <>
+                    {/* Overview Tab */}
+                    {activeAnalyticsTab === 'overview' && (
+                      <div>
+                        <h3 className="text-lg font-semibold mb-4">System Overview</h3>
+                        {analyticsData.systemStats && (
+                          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+                            <div className="bg-gray-50 p-4 rounded">
+                              <div className="text-2xl font-bold text-pink-600">{analyticsData.systemStats.total_users}</div>
+                              <div className="text-sm text-gray-600">Total Users</div>
+                            </div>
+                            <div className="bg-gray-50 p-4 rounded">
+                              <div className="text-2xl font-bold text-pink-600">{analyticsData.systemStats.total_questions}</div>
+                              <div className="text-sm text-gray-600">Total Questions</div>
+                            </div>
+                            <div className="bg-gray-50 p-4 rounded">
+                              <div className="text-2xl font-bold text-pink-600">{analyticsData.systemStats.total_interactions}</div>
+                              <div className="text-sm text-gray-600">Total Interactions</div>
+                            </div>
+                            <div className="bg-gray-50 p-4 rounded">
+                              <div className="text-2xl font-bold text-pink-600">{analyticsData.systemStats.daily_active_users}</div>
+                              <div className="text-sm text-gray-600">Daily Active Users</div>
+                            </div>
+                          </div>
+                        )}
+                        
+                        {analyticsData.userAnalytics && (
+                          <div>
+                            <h4 className="text-md font-semibold mb-3">Your Analytics</h4>
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                              <div className="bg-green-50 p-4 rounded">
+                                <div className="text-xl font-bold text-green-600">{analyticsData.userAnalytics.total_likes_given}</div>
+                                <div className="text-sm text-gray-600">Likes Given</div>
+                              </div>
+                              <div className="bg-orange-50 p-4 rounded">
+                                <div className="text-xl font-bold text-orange-600">{analyticsData.userAnalytics.total_super_likes_given}</div>
+                                <div className="text-sm text-gray-600">Super Likes Given</div>
+                              </div>
+                              <div className="bg-red-50 p-4 rounded">
+                                <div className="text-xl font-bold text-red-600">{analyticsData.userAnalytics.total_dislikes_given}</div>
+                                <div className="text-sm text-gray-600">Dislikes Given</div>
+                              </div>
+                              <div className="bg-blue-50 p-4 rounded">
+                                <div className="text-xl font-bold text-blue-600">{analyticsData.userAnalytics.total_interactions_given}</div>
+                                <div className="text-sm text-gray-600">Total Interactions</div>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Questions Tab */}
+                    {activeAnalyticsTab === 'questions' && (
+                      <div>
+                        <div className="flex justify-between items-center mb-4">
+                          <h3 className="text-lg font-semibold">Question Analytics</h3>
+                          <div className="flex gap-2">
+                            <select
+                              value={analyticsSortBy}
+                              onChange={(e) => setAnalyticsSortBy(e.target.value as any)}
+                              className="px-3 py-1 border rounded text-sm"
+                            >
+                              <option value="total_interactions">Total Interactions</option>
+                              <option value="likes">Likes</option>
+                              <option value="super_likes">Super Likes</option>
+                              <option value="dislikes">Dislikes</option>
+                              <option value="created_at">Created Date</option>
+                            </select>
+                            <select
+                              value={analyticsSortOrder}
+                              onChange={(e) => setAnalyticsSortOrder(e.target.value as any)}
+                              className="px-3 py-1 border rounded text-sm"
+                            >
+                              <option value="desc">Descending</option>
+                              <option value="asc">Ascending</option>
+                            </select>
+                          </div>
+                        </div>
+                        <div className="overflow-x-auto">
               <table className="min-w-full text-sm">
                 <thead>
                   <tr className="border-b">
-                    <th className="px-4 py-2 text-left font-semibold">Sl.</th>
-                    <th className="px-4 py-2 text-left font-semibold">Name</th>
-                    <th className="px-4 py-2 text-left font-semibold">Phone No.</th>
-                    <th className="px-4 py-2 text-left font-semibold">Payment</th>
-                    <th className="px-4 py-2 text-left font-semibold">How many cards they swipe</th>
-                    <th className="px-4 py-2 text-left font-semibold">How many cards they skip</th>
-                    <th className="px-4 py-2 text-left font-semibold">Cards they like</th>
-                    <th className="px-4 py-2 text-left font-semibold">Cards they dislike</th>
-                    <th className="px-4 py-2 text-left font-semibold">Cards they superlike</th>
+                                <th className="px-4 py-2 text-left font-semibold">Question</th>
+                                <th className="px-4 py-2 text-left font-semibold">Genres</th>
+                                <th className="px-4 py-2 text-left font-semibold">Likes</th>
+                                <th className="px-4 py-2 text-left font-semibold">Super Likes</th>
+                                <th className="px-4 py-2 text-left font-semibold">Dislikes</th>
+                                <th className="px-4 py-2 text-left font-semibold">Total</th>
+                                <th className="px-4 py-2 text-left font-semibold">Created</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {dummyUsers.map((user, idx) => (
-                    <tr key={idx} className="border-b">
-                      <td className="px-4 py-2">{idx + 1}</td>
-                      <td className="px-4 py-2">{user.name}</td>
-                      <td className="px-4 py-2">{user.phone}</td>
-                      <td className="px-4 py-2">{user.payment}</td>
-                      <td className="px-4 py-2">{user.swipes}</td>
-                      <td className="px-4 py-2">{user.skips}</td>
-                      <td className="px-4 py-2">{user.likes}</td>
-                      <td className="px-4 py-2">{user.dislikes}</td>
-                      <td className="px-4 py-2">{user.superlikes}</td>
+                              {analyticsData.questions.map((question: any) => (
+                                <tr key={question.question_id} className="border-b">
+                                  <td className="px-4 py-2 max-w-xs truncate">{question.question}</td>
+                                  <td className="px-4 py-2">
+                                    <div className="flex flex-wrap gap-1">
+                                      {question.genres?.slice(0, 2).map((genre: any) => (
+                                        <span key={genre.genre_id} className="px-2 py-1 bg-pink-100 text-pink-700 rounded text-xs">
+                                          {genre.name}
+                                        </span>
+                                      ))}
+                                      {question.genres?.length > 2 && (
+                                        <span className="px-2 py-1 bg-gray-100 text-gray-700 rounded text-xs">
+                                          +{question.genres.length - 2}
+                                        </span>
+                                      )}
+                                    </div>
+                                  </td>
+                                  <td className="px-4 py-2 text-green-600 font-medium">{question.analytics?.total_likes || 0}</td>
+                                  <td className="px-4 py-2 text-orange-600 font-medium">{question.analytics?.total_super_likes || 0}</td>
+                                  <td className="px-4 py-2 text-red-600 font-medium">{question.analytics?.total_dislikes || 0}</td>
+                                  <td className="px-4 py-2 font-medium">{question.analytics?.total_interactions || 0}</td>
+                                  <td className="px-4 py-2 text-gray-600">{new Date(question.created_at).toLocaleDateString()}</td>
                     </tr>
                   ))}
                 </tbody>
               </table>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Users Tab */}
+                    {activeAnalyticsTab === 'users' && (
+                      <div>
+                        <h3 className="text-lg font-semibold mb-4">User Analytics</h3>
+                        {analyticsData.allUsers.length > 0 ? (
+                          <div className="overflow-x-auto">
+                            <table className="min-w-full text-sm">
+                              <thead>
+                                <tr className="border-b">
+                                  <th className="px-4 py-2 text-left font-semibold">User ID</th>
+                                  <th className="px-4 py-2 text-left font-semibold">Likes</th>
+                                  <th className="px-4 py-2 text-left font-semibold">Super Likes</th>
+                                  <th className="px-4 py-2 text-left font-semibold">Dislikes</th>
+                                  <th className="px-4 py-2 text-left font-semibold">Total Interactions</th>
+                                  <th className="px-4 py-2 text-left font-semibold">Last Active</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {analyticsData.allUsers.map((user: any, idx: number) => (
+                                  <tr key={user.user_id || idx} className="border-b">
+                                    <td className="px-4 py-2">{user.user_id || 'N/A'}</td>
+                                    <td className="px-4 py-2 text-green-600">{user.likes || 0}</td>
+                                    <td className="px-4 py-2 text-orange-600">{user.super_likes || 0}</td>
+                                    <td className="px-4 py-2 text-red-600">{user.dislikes || 0}</td>
+                                    <td className="px-4 py-2 font-medium">{user.total_interactions || 0}</td>
+                                    <td className="px-4 py-2 text-gray-600">
+                                      {user.last_active ? new Date(user.last_active).toLocaleDateString() : 'N/A'}
+                                    </td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        ) : (
+                          <p className="text-gray-600">No user data available</p>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Top Questions Tab */}
+                    {activeAnalyticsTab === 'top' && (
+                      <div>
+                        <h3 className="text-lg font-semibold mb-4">Top Questions</h3>
+                        {analyticsData.topQuestions.length > 0 ? (
+                          <div className="space-y-4">
+                            {analyticsData.topQuestions.map((question: any, idx: number) => (
+                              <div key={question.question_id} className="bg-gray-50 p-4 rounded-lg">
+                                <div className="flex items-start justify-between">
+                                  <div className="flex-1">
+                                    <div className="flex items-center gap-2 mb-2">
+                                      <span className="bg-pink-500 text-white px-2 py-1 rounded text-sm font-bold">
+                                        #{idx + 1}
+                                      </span>
+                                      <span className="text-sm text-gray-600">Rank</span>
+                                    </div>
+                                    <h4 className="font-medium mb-2">{question.question}</h4>
+                                    {question.genres && question.genres.length > 0 && (
+                                      <div className="flex flex-wrap gap-1 mb-2">
+                                        {question.genres.map((genre: any) => (
+                                          <span key={genre.genre_id} className="px-2 py-1 bg-pink-100 text-pink-700 rounded text-xs">
+                                            {genre.name}
+                                          </span>
+                                        ))}
+                                      </div>
+                                    )}
+                                  </div>
+                                  <div className="text-right">
+                                    <div className="grid grid-cols-3 gap-4 text-sm">
+                                      <div className="text-center">
+                                        <div className="font-bold text-green-600">{question.total_likes || 0}</div>
+                                        <div className="text-xs text-gray-600">Likes</div>
+                                      </div>
+                                      <div className="text-center">
+                                        <div className="font-bold text-orange-600">{question.total_super_likes || 0}</div>
+                                        <div className="text-xs text-gray-600">Super</div>
+                                      </div>
+                                      <div className="text-center">
+                                        <div className="font-bold text-red-600">{question.total_dislikes || 0}</div>
+                                        <div className="text-xs text-gray-600">Dislikes</div>
+                                      </div>
+                                    </div>
+                                    <div className="mt-2 text-center">
+                                      <div className="font-bold text-lg">{question.total_interactions || 0}</div>
+                                      <div className="text-xs text-gray-600">Total</div>
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <p className="text-gray-600">No top questions data available</p>
+                        )}
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
             </div>
           )}
         </main>

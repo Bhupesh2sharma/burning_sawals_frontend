@@ -5,11 +5,12 @@ import { useAuth } from "./AuthProvider";
 import { FiLogOut, FiMessageSquare } from "react-icons/fi";
 
 export default function Header() {
+  // const { isAuthenticated, logout, user } = useAuth();
   const { isAuthenticated, logout, user } = useAuth();
-
+    //  const isAuthenticated = true;
   return (
-    <header className="bg-white text-[#BE1847] shadow-sm">
-      <div className="max-w-7xl mx-auto px-4 py-4 flex justify-between items-center">
+    <header className="bg-[#F8F8F8] text-[#BE1847] sticky top-0 z-50 shadow-[0_8px_32px_rgba(190,24,71,0.15)] backdrop-blur-sm">
+      <div className="max-w-7xl mx-auto px-4 py-4 flex justify-between items-center ">
         
         {/* Logo */}
         <Link href="/" className="text-lg md:text-xl font-tilt font-bold">
@@ -21,25 +22,19 @@ export default function Header() {
           {isAuthenticated ? (
             // Authenticated user buttons
             <>
-              <span className="text-gray-600 text-sm md:text-base font-rubik">
-                Welcome, {user?.user_name || user?.phone_number}
+              <span className="text-pink-600 text-sm md:text-base font-bold font-quicksand">
+                feedback&Suggestions 
               </span>
+
               <button
-                onClick={logout}
-                className="flex items-center gap-2 px-4 py-2 text-[#BE1847] font-rubik text-sm md:text-base hover:bg-gray-100 rounded-md transition"
+                // onClick={logout}
+                className="flex items-center gap-2 px-4 py-2 text-[#BE1847] bg-gray-400 font-rubik text-sm md:text-base hover:bg-gray-100 w-10 h-10 rounded-full transition"
                 title="Logout"
               >
                 <FiLogOut size={16} />
-                Logout
+            
               </button>
-              <Link
-                href="/feedback"
-                className="flex items-center gap-2 px-4 py-2 text-[#BE1847] font-rubik text-sm md:text-base hover:bg-gray-100 rounded-md transition"
-                title="Feedback & Suggestions"
-              >
-                <FiMessageSquare size={16} />
-                Feedback
-              </Link>
+           
             </>
           ) : (
             // Non-authenticated user buttons
