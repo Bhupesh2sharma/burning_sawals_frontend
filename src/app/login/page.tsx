@@ -3,15 +3,31 @@ import React, { useState } from "react";
 import { useForm } from "react-hook-form";
 import { useAuth } from "../../components/AuthProvider";
 import { useRouter } from "next/navigation";
-
+import RecaptchaV3, { executeRecaptchaV3 } from "../../components/RecaptchaV3";
 
 export default function PhoneNumberPage() {
     const [apiError, setApiError] = useState("");
     const [loading, setLoading] = useState(false);
     const [otpSent, setOtpSent] = useState(false);
-    const [isExistingUser, setIsExistingUser] = useState<boolean | null>(null);
+    const [, setIsExistingUser] = useState<boolean | null>(null);
+    const [recaptchaError, setRecaptchaError] = useState("");
     const { sendOTP } = useAuth();
     const router = useRouter();
+
+    const RECAPTCHA_SITE_KEY = process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY || "";
+
+    // Debug: Log the site key on component mount
+    React.useEffect(() => {
+        console.log(
+            "Login page loaded - RECAPTCHA_SITE_KEY:",
+            RECAPTCHA_SITE_KEY
+        );
+        console.log("Environment variables:", {
+            NEXT_PUBLIC_RECAPTCHA_SITE_KEY:
+                process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY,
+            NEXT_PUBLIC_API_BASE_URL: process.env.NEXT_PUBLIC_API_BASE_URL,
+        });
+    }, [RECAPTCHA_SITE_KEY]);
 
     const {
         register,
@@ -21,13 +37,27 @@ export default function PhoneNumberPage() {
         defaultValues: { phone: "" },
     });
 
-
-    const onSubmit = async (data: any) => {
+    const onSubmit = async (data: { phone: string }) => {
         setApiError("");
+        setRecaptchaError("");
         setLoading(true);
 
         try {
-            const result = await sendOTP(data.phone, "");
+            // Generate reCAPTCHA token
+            console.log(
+                "Generating reCAPTCHA token with site key:",
+                RECAPTCHA_SITE_KEY
+            );
+            const captchaToken = await executeRecaptchaV3(
+                RECAPTCHA_SITE_KEY,
+                "send_otp"
+            );
+            console.log(
+                "reCAPTCHA token generated:",
+                captchaToken ? "success" : "failed"
+            );
+
+            const result = await sendOTP(data.phone, captchaToken);
 
             if (result.success) {
                 setOtpSent(true);
@@ -41,14 +71,38 @@ export default function PhoneNumberPage() {
             } else {
                 setApiError(result.message);
             }
-        } catch (err: any) {
+        } catch (err: unknown) {
+            console.error("Login error:", err);
+
+            // Handle reCAPTCHA errors
+            if (err instanceof Error && err.message.includes("reCAPTCHA")) {
+                setRecaptchaError(
+                    "Security verification failed. Please refresh the page and try again."
+                );
+            }
             // Handle different types of errors
-            if (err.response?.status === 429) {
-                setApiError("Too many requests. Please wait a few minutes before trying again.");
-            } else if (err.response?.data?.message) {
-                setApiError(`Backend Error: ${err.response.data.message}`);
-            } else if (err.response?.data?.error) {
-                setApiError(`Backend Error: ${err.response.data.error}`);
+            else if (err && typeof err === "object" && "response" in err) {
+                const axiosError = err as {
+                    response?: {
+                        status?: number;
+                        data?: { message?: string; error?: string };
+                    };
+                };
+                if (axiosError.response?.status === 429) {
+                    setApiError(
+                        "Too many requests. Please wait a few minutes before trying again."
+                    );
+                } else if (axiosError.response?.data?.message) {
+                    setApiError(
+                        `Backend Error: ${axiosError.response.data.message}`
+                    );
+                } else if (axiosError.response?.data?.error) {
+                    setApiError(
+                        `Backend Error: ${axiosError.response.data.error}`
+                    );
+                } else {
+                    setApiError("Failed to send OTP. Please try again.");
+                }
             } else {
                 setApiError("Failed to send OTP. Please try again.");
             }
@@ -56,8 +110,6 @@ export default function PhoneNumberPage() {
             setLoading(false);
         }
     };
-
-
 
     return (
         <div className="min-h-screen flex flex-col items-center justify-center bg-pink-100">
@@ -77,20 +129,22 @@ export default function PhoneNumberPage() {
                             type="tel"
                             placeholder=""
                             className="bg-gray-200 rounded-lg px-4 py-3 w-full text-lg font-quicksand"
-                        {...register("phone", {
-                            required: "Phone number is required",
-                            validate: (value) => {
-                                const cleaned = value.replace(/\D/g, "");
-                                if (cleaned.length !== 10) {
-                                    return "Phone number must be 10 digits";
-                                }
-                                if (
-                                    !["6", "7", "8", "9"].includes(cleaned[0])
-                                ) {
-                                    return "Phone number must start with 6, 7, 8, or 9";
-                                }
-                                return true;
-                            },
+                            {...register("phone", {
+                                required: "Phone number is required",
+                                validate: (value) => {
+                                    const cleaned = value.replace(/\D/g, "");
+                                    if (cleaned.length !== 10) {
+                                        return "Phone number must be 10 digits";
+                                    }
+                                    if (
+                                        !["6", "7", "8", "9"].includes(
+                                            cleaned[0]
+                                        )
+                                    ) {
+                                        return "Phone number must start with 6, 7, 8, or 9";
+                                    }
+                                    return true;
+                                },
                             })}
                             disabled={loading || otpSent}
                         />
@@ -101,15 +155,37 @@ export default function PhoneNumberPage() {
                         </span>
                     )}
 
+                    {/* reCAPTCHA Component */}
+                    <RecaptchaV3
+                        siteKey={RECAPTCHA_SITE_KEY}
+                        onVerify={(token) => {
+                            console.log(
+                                "reCAPTCHA verified:",
+                                token ? "success" : "failed"
+                            );
+                        }}
+                        onError={(error) => {
+                            console.error("reCAPTCHA error:", error);
+                            setRecaptchaError(error);
+                        }}
+                        onReady={() => {
+                            console.log("reCAPTCHA ready");
+                        }}
+                    />
 
                     <button
                         type="submit"
-                        className="bg-rose-700 text-pink-100 py-3 px-6 rounded-lg font-bold font-quicksand text-2xl hover:bg-rose-800 transition disabled:opacity-50 disabled:cursor-not-allowed w-full"
+                        className="bg-rose-700 text-pink-100 py-3 px-6 rounded-lg font-bold font-quicksand text-2xl hover:bg-rose-800 transition disabled:opacity-50 disabled:cursor-not-allowed w-full cursor-pointer"
                         disabled={loading || otpSent}
                     >
                         {loading ? "Sending..." : "Send OTP"}
                     </button>
-                    
+
+                    {recaptchaError && (
+                        <div className="text-red-600 text-sm text-center font-quicksand">
+                            {recaptchaError}
+                        </div>
+                    )}
                     {apiError && (
                         <div className="text-red-600 text-sm text-center font-quicksand">
                             {apiError}

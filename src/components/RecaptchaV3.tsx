@@ -165,7 +165,7 @@ export const executeRecaptchaV3 = async (
     action: string = "submit"
 ): Promise<string> => {
     console.log("executeRecaptchaV3 called with:", { siteKey, action });
-    
+
     if (!window.grecaptcha) {
         console.error("reCAPTCHA not loaded - window.grecaptcha is undefined");
         throw new Error("reCAPTCHA not loaded");
@@ -174,7 +174,10 @@ export const executeRecaptchaV3 = async (
     try {
         console.log("Executing reCAPTCHA with siteKey:", siteKey);
         const token = await window.grecaptcha.execute(siteKey, { action });
-        console.log("reCAPTCHA token generated successfully, length:", token?.length);
+        console.log(
+            "reCAPTCHA token generated successfully, length:",
+            token?.length
+        );
         return token;
     } catch (error) {
         console.error("reCAPTCHA execution error:", error);
