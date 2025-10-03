@@ -10,7 +10,7 @@ export default function OTPVerificationPage() {
     const [loading, setLoading] = useState(false);
     const [success, setSuccess] = useState(false);
     const [userName, setUserName] = useState("");
-    const [phone, setPhone] = useState("");
+    const [email, setEmail] = useState("");
     const [isExistingUser, setIsExistingUser] = useState<boolean | null>(null);
     const [usernameStatus, setUsernameStatus] = useState<
         "idle" | "checking" | "available" | "taken"
@@ -24,13 +24,13 @@ export default function OTPVerificationPage() {
     const otpRefs = useRef<(HTMLInputElement | null)[]>([]);
 
     useEffect(() => {
-        const storedPhone = localStorage.getItem("auth_phone");
+        const storedEmail = localStorage.getItem("auth_email");
         const storedUserStatus = localStorage.getItem("is_existing_user");
 
-        if (!storedPhone) {
+        if (!storedEmail) {
             router.push("/login");
         } else {
-            setPhone(storedPhone);
+            setEmail(storedEmail);
             const isExisting = storedUserStatus === "true";
             setIsExistingUser(isExisting);
             // Skip username step for existing users
@@ -174,7 +174,7 @@ export default function OTPVerificationPage() {
     // Handle OTP submission
     const handleOtpSubmit = async (otpValue: string) => {
         console.log("OTP verification started with:", {
-            phone,
+            email,
             otp: otpValue,
             userName,
             isExistingUser,
@@ -183,7 +183,7 @@ export default function OTPVerificationPage() {
         setLoading(true);
         try {
             const result = await verifyOTP(
-                phone,
+                email,
                 otpValue,
                 isExistingUser ? undefined : userName
             );
@@ -192,7 +192,7 @@ export default function OTPVerificationPage() {
                 console.log("Verification successful, redirecting to home");
                 setSuccess(true);
                 // Clear stored data
-                localStorage.removeItem("auth_phone");
+                localStorage.removeItem("auth_email");
                 localStorage.removeItem("is_existing_user");
                 setTimeout(() => {
                     router.push("/home");
@@ -329,7 +329,7 @@ export default function OTPVerificationPage() {
                 {currentStep === "otp" && (
                     <div className="w-full flex flex-col gap-4">
                         <div className="text-center text-gray-600 mb-2">
-                            Enter the 6-digit OTP sent to {phone}
+                            Enter the 6-digit OTP sent to {email}
                         </div>
 
                         {/* Back button for new users */}

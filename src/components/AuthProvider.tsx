@@ -51,7 +51,6 @@ export default function AuthProvider({ children }: { children: ReactNode }) {
     const [token, setToken] = useState<string | null>(null);
     const [isLoading, setIsLoading] = useState(true); // Start as true to check local storage
 
-
     useEffect(() => {
         const storedToken = localStorage.getItem("auth_token");
         if (storedToken) {
@@ -63,22 +62,20 @@ export default function AuthProvider({ children }: { children: ReactNode }) {
         setIsLoading(false);
     }, []);
 
-
-    const sendOTP = async (phoneNumber: string, captchaToken: string) => {
+    const sendOTP = async (email: string, captchaToken: string) => {
         try {
             console.log("AuthProvider sendOTP called with:", {
-                phoneNumber,
-                captchaToken: captchaToken ? `${captchaToken.substring(0, 20)}...` : 'null',
-                captchaTokenLength: captchaToken?.length
+                email,
+                captchaToken: captchaToken
+                    ? `${captchaToken.substring(0, 20)}...`
+                    : "null",
+                captchaTokenLength: captchaToken?.length,
             });
-            
-            const response = await AuthService.sendOTP(
-                phoneNumber,
-                captchaToken
-            );
-            
+
+            const response = await AuthService.sendOTP(email, captchaToken);
+
             console.log("AuthService.sendOTP response:", response);
-            
+
             return {
                 success: true,
                 message: response.data.message,
@@ -89,25 +86,20 @@ export default function AuthProvider({ children }: { children: ReactNode }) {
             console.error("AuthProvider sendOTP error:", error);
             console.error("Error response data:", error.response?.data);
             console.error("Error response status:", error.response?.status);
-            
+
             return {
                 success: false,
-                message: error.response?.data?.message || error.response?.data?.error || "Failed to send OTP",
+                message:
+                    error.response?.data?.message ||
+                    error.response?.data?.error ||
+                    "Failed to send OTP",
             };
         }
     };
 
-    const verifyOTP = async (
-        phoneNumber: string,
-        otp: string,
-        userName?: string
-    ) => {
+    const verifyOTP = async (email: string, otp: string, userName?: string) => {
         try {
-            const response = await AuthService.verifyOTP(
-                phoneNumber,
-                otp,
-                userName
-            );
+            const response = await AuthService.verifyOTP(email, otp, userName);
             const newToken = response.data.data.token;
             const newUser = response.data.data.user;
             localStorage.setItem("auth_token", newToken);
@@ -151,7 +143,6 @@ export default function AuthProvider({ children }: { children: ReactNode }) {
         setUser(null);
         // router.push("/login"); // Redirect to login after logout
     };
-
 
     const refreshToken = async () => {
         // Implement token refresh logic here
