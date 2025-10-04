@@ -135,7 +135,7 @@ export default function FeedbackPage() {
                             </select>
                             {errors.type && (
                                 <p className="text-red-500 text-sm mt-1">
-                                    {errors.type.message}
+                                    {errors.type.message as string}
                                 </p>
                             )}
                         </div>
@@ -155,7 +155,7 @@ export default function FeedbackPage() {
                             />
                             {errors.subject && (
                                 <p className="text-red-500 text-sm mt-1">
-                                    {errors.subject.message}
+                                    {errors.subject.message as string}
                                 </p>
                             )}
                         </div>
@@ -175,7 +175,7 @@ export default function FeedbackPage() {
                             />
                             {errors.message && (
                                 <p className="text-red-500 text-sm mt-1">
-                                    {errors.message.message}
+                                    {errors.message.message as string}
                                 </p>
                             )}
                         </div>
