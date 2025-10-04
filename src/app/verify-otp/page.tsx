@@ -126,7 +126,7 @@ export default function OTPVerificationPage() {
         try {
             // For resend, we'll need to show CAPTCHA again
             // For now, we'll use a placeholder token - in production, you'd want to show CAPTCHA again
-            const result = await sendOTP(phone, "resend-token-placeholder");
+            const result = await sendOTP(email, "resend-token-placeholder");
             if (result.success) {
                 console.log("OTP resent successfully");
                 setIsExistingUser(result.is_existing_user || false);

@@ -1,0 +1,9 @@
+{
+    "env": {
+        "NEXT_PUBLIC_API_BASE_URL": "https://burningsawals.vercel.app/api",
+        "NEXT_PUBLIC_RECAPTCHA_SITE_KEY": "6LdTWd0rAAAAAMHt3C4MgGCLQXnvERRnYAGD_FyC"
+    }
+}
+
+
+
