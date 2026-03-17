@@ -24,9 +24,14 @@ export default function Header() {
                     {isAuthenticated ? (
                         // Authenticated user buttons
                         <>
-                            <span className="text-pink-600 text-sm md:text-base font-bold font-quicksand">
-                                feedback & suggestions
-                            </span>
+                            <div className="flex items-center gap-4 text-sm md:text-base font-bold font-quicksand">
+                                <Link href="/feedback" className="text-pink-600 cursor-pointer">
+                                    feedback & suggestions
+                                </Link>
+                                <Link href="/blogs" className="text-pink-600 cursor-pointer">
+                                    blogs
+                                </Link>
+                            </div>
 
                             <button
                                 onClick={logout}
